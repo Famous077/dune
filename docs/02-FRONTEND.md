@@ -1,0 +1,512 @@
+# 02 — Frontend build spec
+
+Bearings · CloudSmiths · First Commit (AWS x WeMakeDevs)
+
+Owners: the two frontend builders. Read `03-API.md` alongside this.
+
+## Scope and ground rules
+
+Three screens. Nothing else gets built.
+
+### Stack
+
+- **React 18 + TypeScript + Vite.** Fast dev server, simple build, deploys to Amplify Hosting without configuration.
+- **Tailwind** for styling, with the tokens in this doc defined as CSS variables.
+- **shadcn/ui** for primitives: button, input, card, dialog, tabs, badge, skeleton, toast. Copy in only the components used.
+- **TanStack Query** for server state. It gives polling, caching and loading states for free, and the indexing screen needs polling.
+- **React Flow** for the graph. Reasons in the graph section.
+- **lucide-react** for icons. One icon set, no mixing.
+
+No state management library. TanStack Query holds server state, `useState` holds UI state. There is nothing else.
+
+### Ground rules
+
+**Types come from `packages/shared`.** Do not redeclare `Answer` or `GraphNode` in the frontend. If a type needs changing, it changes in shared and both sides see it.
+
+**Never block on the backend.** Dummy data lives in `src/mocks/` from hour one. A flag switches between mock and live. The frontend should be demo-ready before the API exists.
+
+**Every component handles four states:** loading, empty, error, success. A component that only handles success is not finished. This is written here because it is the single most common cause of a demo breaking on camera.
+
+**No raw error strings in the UI.** Every failure gets a human sentence and a retry action. The backend spec has a table of failure cases; each one needs a corresponding UI state.
+
+**Desktop only, latest Chrome.** Do not spend an hour on mobile breakpoints. The video is recorded on a laptop. Make sure nothing is catastrophically broken below 1280px, and stop there.
+
+### Why the UI matters here
+
+Best UI is a separate ₹1,00,000 prize and the same submission is automatically considered for it. Nothing extra to enter. That prize is won on clarity, hierarchy and restraint, not animation or gradients. A judge deciding it will be looking at typography, spacing consistency, and whether the empty and error states were thought about at all.
+
+## Design direction
+
+### The character
+
+**A technical instrument, not a marketing site.** Bearings shows a developer where they are in a codebase. It should feel like a precise tool: dense where density helps, quiet everywhere else, with nothing on screen that is not carrying information.
+
+The reference points are a good terminal, a well-made IDE panel, a flight instrument. Not a SaaS landing page, not a dashboard full of cards with big numbers.
+
+### Dark by default
+
+Developers work in dark themes and a graph of coloured nodes reads better on dark. Build dark first. A light theme is not required this weekend and should not be attempted.
+
+### Three principles
+
+**1. Typography does the work.** Almost all hierarchy comes from size, weight and colour of text. Very few boxes, very few borders. When something needs separating, try space first, a subtle border second, a card third.
+
+**2. One accent colour, used sparingly.** Amber is the accent. It marks the recommended file, the active node, the primary action. If everything is accented, nothing is. A screen should have one or two amber elements, not eight.
+
+**3. Monospace for anything from the codebase.** File paths, symbol names, line numbers, code. Prose is sans. This split is what makes the interface legible at a glance and it must be applied consistently.
+
+### What to avoid
+
+- Gradients, glows, glassmorphism
+- Animated transitions longer than 150ms
+- Emoji in the interface
+- Rounded corners above 8px, which read as consumer rather than tool
+- Large hero text or marketing copy anywhere inside the app
+- More than two font weights in use at once
+
+### The test
+
+A screenshot should look like something a developer would leave open all day. If it looks like a product launch page, it has gone wrong.
+
+## Design tokens
+
+Define these once as CSS variables. Never hardcode a colour or a spacing value anywhere else.
+
+### Colour
+
+```css
+:root {
+  /* surfaces, darkest to lightest */
+  --bg:          #0B0D10;   /* page */
+  --surface:     #121519;   /* panels, cards */
+  --surface-2:   #181C22;   /* raised: inputs, hover */
+  --border:      #232931;   /* all borders */
+  --border-soft: #1A1F26;   /* dividers inside a panel */
+
+  /* text */
+  --text:        #E6E9EE;   /* primary */
+  --text-muted:  #9BA4B0;   /* secondary, labels */
+  --text-dim:    #6B7684;   /* tertiary, line numbers */
+
+  /* accent */
+  --accent:      #F0A22E;   /* amber, the one accent */
+  --accent-dim:  #7A5417;   /* accent borders, backgrounds */
+
+  /* semantic */
+  --ok:          #4ADE80;
+  --warn:        #FBBF24;
+  --error:       #F87171;
+  --info:        #60A5FA;
+
+  /* graph node categories */
+  --node-entry:  #F0A22E;   /* entry points, amber */
+  --node-route:  #60A5FA;
+  --node-service:#A78BFA;
+  --node-model:  #4ADE80;
+  --node-util:   #6B7684;
+}
+```
+
+### Typography
+
+```css
+--font-sans: 'Inter', system-ui, sans-serif;
+--font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+```
+
+Load both from Google Fonts. Scale, and use nothing outside it:
+
+| Token | Size / line-height | Use |
+| --- | --- | --- |
+| `text-xs` | 12 / 16 | Line numbers, metadata, badges |
+| `text-sm` | 13 / 20 | Body default, most of the interface |
+| `text-base` | 15 / 24 | Answer body, panel content |
+| `text-lg` | 18 / 26 | Section headings |
+| `text-xl` | 22 / 30 | Screen title, used once per screen |
+
+Weights: 400 and 600 only. No 500, no 700. Two weights is a constraint that makes a small interface look considered.
+
+### Spacing
+
+4px base. Use 4, 8, 12, 16, 24, 32, 48 and nothing between them. Inconsistent spacing is the fastest way to look unfinished, and it is what a Best UI judge notices first.
+
+### Radius and shadow
+
+```css
+--radius-sm: 4px;   /* badges, small controls */
+--radius:    6px;   /* buttons, inputs, cards */
+--radius-lg: 8px;   /* panels, modals. Maximum. */
+```
+
+One shadow, used only on floating elements (dropdowns, modals):
+
+```css
+--shadow: 0 8px 24px rgba(0,0,0,0.4);
+```
+
+Cards and panels get a border, not a shadow.
+
+### Motion
+
+150ms ease-out for everything. Fade and small translate only. No spring, no bounce, no stagger. Skeletons for loading, never spinners, except inside a button during a submit.
+
+## Screen 1 — Connect a repo
+
+The first thing a judge sees. It has one job and should look like it has one job.
+
+### Layout
+
+Centred column, max-width 560px, vertically centred in the viewport.
+
+```
+            Bearings
+            Know where you are in any codebase.
+
+  ┌────────────────────────────────────────────┐
+  │ github.com/owner/repo                      │  ← input, mono font
+  └────────────────────────────────────────────┘
+            [ Index repository ]                   ← primary, amber
+
+            Try it on a sample repo →               ← text link
+```
+
+- Product name in `text-xl`, weight 600
+- Tagline in `text-sm`, `--text-muted`
+- Input is monospace, since it holds a URL
+- 48px between the title block and the input, 24px between input and button
+
+### The sample repo link matters
+
+It loads the pre-indexed demo repo instantly. A judge who does not want to wait through indexing can be in the product in one click. Put it in from the start; it is also what the video uses.
+
+### Indexing state
+
+On submit, the same centred column transforms in place. No page navigation, no modal.
+
+```
+            Indexing owner/repo
+
+  ✓ Cloning                          412 files
+  ✓ Parsing                          389 parsed, 2 skipped
+  ⣾ Embedding                        1,204 / 2,180 chunks
+  ○ Finalising
+
+  ────────────────────────────  62%
+
+            This usually takes under two minutes.
+```
+
+- Poll `GET /repos/:repoId` every 1.5 seconds with TanStack Query
+- Completed stages: green check, `--ok`
+- Active stage: small animated indicator, counts updating
+- Pending stages: hollow circle, `--text-dim`
+- Counts in monospace, right-aligned, so the numbers line up as they change
+- Thin progress bar, amber fill, 2px tall. No thick rounded bars.
+
+### Failure state
+
+```
+            Could not index owner/repo
+
+            Cloning failed: repository not found or private.
+            Check the URL, or try a public repository.
+
+            [ Try another repo ]   [ Use sample repo ]
+```
+
+The stage that failed stays visible with a red marker. The user should be able to see how far it got. Never show a stack trace.
+
+### On success
+
+Navigate straight to Screen 2. No success screen, no confirmation. The map appearing is the confirmation.
+
+## Screen 2 — Map and answers
+
+The main screen. This is where the demo spends most of its time, so it gets the most care.
+
+### Layout
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ Bearings   owner/repo   412 files              Context  ⌘K   │  ← 48px bar
+├───────────────────────────────────────┬──────────────────────┤
+│                                       │                      │
+│                                       │   Ask where a        │
+│            GRAPH                      │   change belongs     │
+│                                       │   ┌────────────────┐ │
+│                                       │   │                │ │
+│                                       │   └────────────────┘ │
+│                                       │   [ Find ]           │
+│                                       │                      │
+│                                       │   ── answer card ──  │
+│                                       │                      │
+└───────────────────────────────────────┴──────────────────────┘
+        flexible, min 60%                    fixed 420px
+```
+
+Top bar: product name, repo name in monospace, file count in `--text-dim`, and a link to the context panel on the right.
+
+### Query input
+
+- Textarea, two rows, grows to four
+- Placeholder: `Where do I add rate limiting to the auth API?`
+- Enter submits, Shift+Enter newlines
+- Below it, three example questions as clickable chips when no answer is shown yet. This solves the blank-page problem and shows a judge what the product is for without a tutorial.
+
+### Answer card
+
+The single most important component in the product. Structure, top to bottom:
+
+```
+┌────────────────────────────────────────┐
+│ RECOMMENDED                      high  │  ← label + confidence badge
+│                                        │
+│ src/middleware/rateLimiter.ts          │  ← mono, 15px, amber
+│                                        │
+│ Attach to                              │
+│ src/routes/auth.ts                     │  ← mono, clickable
+│                                        │
+│ Why                                    │
+│ All authentication endpoints pass      │
+│ through this router.                   │
+│                                        │
+│ Affected                               │
+│ /login  /register  /forgot-password    │  ← mono badges
+│                                        │
+│ Tests to update                        │
+│ auth.test.ts   rateLimit.test.ts       │
+│                                        │
+│ ── Sources ──────────────────────────  │
+│ src/routes/auth.ts:12-48          →    │  ← clickable, opens viewer
+│ src/services/authService.ts:3-20  →    │
+│                                        │
+│ [ Save to context ]                    │
+└────────────────────────────────────────┘
+```
+
+**Section labels** are `text-xs`, uppercase, letter-spaced, `--text-muted`. **Values** are `text-base`. This label-value rhythm is what makes it scan like an instrument readout rather than a chat reply.
+
+**Confidence badge:** green for high, amber for medium, grey for low. On low, replace the single recommendation with a list of two or three candidates and a line saying the answer is uncertain. Do not hide uncertainty — showing it reads as engineering maturity.
+
+**Clicking a source** opens a side drawer with that file at the cited lines, syntax highlighted, the cited range marked. This is the verification step from the user flows and it is what makes the product trustworthy rather than another chat box.
+
+### Graph interaction
+
+- Clicking a node opens the same file drawer
+- The recommended file and attach point get an amber ring on the graph when an answer is shown, connecting the two halves of the screen visually
+- Affected files get a dimmer highlight
+- Hovering a node shows a small tooltip: path, imports in, imports out
+
+### Loading state
+
+While a query runs, show a skeleton in the exact shape of the answer card. Not a spinner. The layout should not jump when the answer arrives.
+
+## Screen 3 — Context panel
+
+The team's shared memory. This is the differentiator, so it needs to feel substantial rather than like a notes field.
+
+### Presentation
+
+A full-height drawer sliding from the right, 520px wide, over the map. Not a separate route — the user should feel they are still in the repo.
+
+### Layout
+
+```
+┌──────────────────────────────────────────┐
+│ Context                          ✕       │
+│ owner/repo                               │
+│                                          │
+│ [ All ] [ Decisions ] [ Dead ends ]      │  ← filter tabs
+│ [ Constraints ]                          │
+│                                          │
+│ ┌──────────────────────────────────────┐ │
+│ │ ⚡ SUGGESTED                          │ │  ← amber left border
+│ │ Passport.js was removed from auth.ts │ │
+│ │ Record why?                          │ │
+│ │ ┌──────────────────────────────────┐ │ │
+│ │ │ editable draft text              │ │ │
+│ │ └──────────────────────────────────┘ │ │
+│ │ [ Save ]  [ Dismiss ]                │ │
+│ └──────────────────────────────────────┘ │
+│                                          │
+│ DECISION                    2 hours ago  │
+│ JWT over sessions                        │
+│ Stateless auth needed for the edge       │
+│ runtime; sessions would need a store.    │
+│ src/auth/jwt.ts  src/middleware/auth.ts  │
+│                                          │
+│ DEAD END                       yesterday │
+│ Passport.js                              │
+│ Conflicted with the existing auth        │
+│ middleware. Removed in #142.             │
+│ src/routes/auth.ts                       │
+│                                          │
+│ ──────────────────────────────────────── │
+│ [ + Add manually ]     [ Export ⧉ ]      │
+└──────────────────────────────────────────┘
+```
+
+### Item types and their markers
+
+| Type | Label colour | Meaning |
+| --- | --- | --- |
+| Decision | `--info` | A choice that was made and should not be re-litigated |
+| Dead end | `--error` | Something tried and rejected. The most valuable type — it stops an agent suggesting it again. |
+| Constraint | `--warn` | A limit the code must respect |
+| Suggested | `--accent` | A draft awaiting approval |
+
+Labels are `text-xs` uppercase. Timestamps are relative and right-aligned in `--text-dim`. File paths at the bottom of each item are monospace `text-xs` and clickable.
+
+### Suggestions
+
+Pending suggestions always sort to the top with an amber left border, so they are visually distinct from confirmed items. The body text is editable in place before saving — the point is human-confirmed context, so editing must be one action, not a modal.
+
+After save, the item animates into position in the main list. 150ms, nothing elaborate.
+
+### Export
+
+Opens a modal showing the generated markdown in a monospace block, with a copy button. Copy should be one click and should show a confirmation toast.
+
+Below the markdown, a short line: `Or connect via MCP: <url>`, with the endpoint copyable. This is where the MCP feature becomes visible in the UI rather than being invisible plumbing, which matters because the video needs to show it.
+
+### Empty state
+
+Not a blank panel. Show one example item, greyed, with a line explaining what gets stored here and why it is shared with the team. A judge who opens this panel first should still understand the feature.
+
+## Component inventory
+
+Every component below must handle loading, empty, error and success. A component that only renders the success case is not done.
+
+| Component | Props | States to handle |
+| --- | --- | --- |
+| `RepoInput` | `onSubmit` | idle, validating, submitting, invalid URL |
+| `IndexProgress` | `job` | each stage, failed at stage, complete |
+| `GraphView` | `graph`, `highlight`, `onNodeClick` | loading skeleton, empty graph, too many nodes, rendered |
+| `QueryBox` | `onAsk`, `disabled` | idle with examples, typing, submitting |
+| `AnswerCard` | `answer` | skeleton, low confidence variant, no answer found, full answer |
+| `SourceLink` | `path`, `lines` | default, hover, file missing |
+| `FileDrawer` | `path`, `highlightLines` | loading, file not found, loaded |
+| `ContextPanel` | `items`, `suggestions` | loading, empty with example, list, save failed |
+| `ContextItem` | `item` | decision, dead end, constraint, agent-authored badge |
+| `SuggestionCard` | `draft`, `onSave`, `onDismiss` | editable, saving, saved, dismissed |
+| `ExportModal` | `markdown` | generating, ready, copied |
+| `ConfidenceBadge` | `level` | high, medium, low |
+| `ErrorState` | `message`, `action` | used everywhere something fails |
+
+### Shared behaviours
+
+**Skeletons, not spinners.** Every loading state is a skeleton in the shape of the thing that is coming. The only exception is a spinner inside a button during submit.
+
+**Errors are sentences.** `ErrorState` takes a human message and an action. No component renders `error.message` directly.
+
+**Monospace rule.** Anything originating in the codebase — paths, symbols, line numbers, route paths, code — renders in `--font-mono`. Applied without exception.
+
+**Agent-authored items** carry a small badge. If an MCP client wrote a context item, a human must be able to see that at a glance.
+
+### Build order
+
+Frontend can build all of this against mocks before any endpoint exists:
+
+1. Tokens, layout shell, top bar
+2. `RepoInput` and `IndexProgress` against a fake job that advances on a timer
+3. `AnswerCard` against a mock answer — build this early, it is the component the demo lives on
+4. `GraphView` against a mock graph
+5. `ContextPanel` and `SuggestionCard`
+6. `FileDrawer`
+7. `ExportModal`
+
+Step 3 before step 4. The answer card matters more to the demo than the graph, and if time runs short the graph can be simpler than planned while the answer card cannot.
+
+## Graph rendering
+
+### Library
+
+**React Flow.** Node positions come pre-computed from the backend, so no layout engine is needed in the browser. React Flow handles pan, zoom, custom nodes and edge rendering, and it renders 500 nodes without trouble.
+
+Do not use D3 force simulation. It runs the layout in the browser, it is non-deterministic, and the graph would settle differently on every load — which looks unstable on camera.
+
+### Node design
+
+A rounded rectangle, not a circle. Circles waste space and cannot hold a filename.
+
+```
+┌─────────────────────┐
+│ ● auth.ts        12 │   ● category dot, name mono 12px,
+└─────────────────────┘     inbound count right, --text-dim
+```
+
+- Width scales with name length, capped at 180px, with the middle of long paths elided
+- Category dot colour from the `--node-*` tokens
+- Entry points get a 1px amber border
+- The recommended file from an active answer gets a 2px amber ring and a slight scale
+- Affected files get a dimmer amber border
+- Unrelated nodes drop to 40% opacity when an answer is shown, so the eye goes straight to what matters
+
+### Edges
+
+Thin, `--border`, 1px, with a small arrowhead. On node hover, edges touching it go to `--text-dim` while the rest fade. Do not animate edges, ever. Animated dashes on a dependency graph look like a screensaver.
+
+### Clustering
+
+Nodes are grouped by top-level directory, provided by the backend as a cluster label. Give each cluster a faint background region with a small label in the corner. This is what turns a hairball into a readable map, and it is most of the difference between a graph that looks impressive and one that looks like noise.
+
+### Controls
+
+Bottom left, minimal: zoom in, zoom out, fit to view. No minimap — the graph is not large enough to need one and it adds clutter.
+
+### Performance guard
+
+Above 300 nodes, render only nodes with at least one edge and show a small line: `showing 287 of 412 files; isolated files hidden`. Isolated files are almost always config and type-only modules and they add nothing to the picture.
+
+### The fallback
+
+If the graph is eating time on Saturday, ship a grouped list view instead: directories as sections, files as rows, with the same highlighting for recommended and affected files. Less impressive, still useful, and it will not be what loses the demo. The answer card is the product; the graph is context around it.
+
+## Working without the backend
+
+The frontend should be demo-ready before a single endpoint exists. This is the whole reason the API contract is frozen on Thursday.
+
+### Setup
+
+```
+src/mocks/
+  graph.json        # ~40 nodes, ~60 edges, realistic paths
+  answer.json       # one high-confidence answer
+  answer-low.json   # low-confidence variant
+  context.json      # 3 decisions, 2 dead ends, 1 constraint
+  suggestions.json  # 2 pending drafts
+  job.json          # indexing job that advances on a timer
+```
+
+```ts
+// src/api/client.ts
+const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';
+```
+
+One flag. Every API function checks it and returns mock data with a 400ms delay, so loading states are visible and get built properly rather than being skipped because everything resolves instantly in development.
+
+### Make the mocks realistic
+
+Use paths from the actual demo repo, not `foo.ts` and `bar.ts`. Two reasons: the layout gets tested against real path lengths, which are longer than people expect, and switching to live data will not reshuffle the whole UI.
+
+Include at least one path long enough to need eliding, one file with a very short name, and one answer with five affected routes. Build against the awkward cases, not the tidy ones.
+
+### Switching to live
+
+Flip the flag. If anything breaks, the contract was not followed by one side or the other, and that is a five-minute fix rather than a rebuild. This is the point of the whole arrangement.
+
+### Integration checklist for Saturday morning
+
+Walk this list with the backend, in order:
+
+1. Submit a repo, job id returned, polling starts
+2. Progress advances through every stage and reaches ready
+3. Graph renders from live data at real scale
+4. A question returns an answer that renders in the card
+5. Source links open the drawer at the right lines
+6. Saving a context item persists and reappears on reload
+7. A second browser sees the first browser's saved item
+8. Export produces markdown
+9. Every error path shows a human message, tested by deliberately breaking each one
+
+Step 9 is the one that gets skipped and the one that ruins demos. Deliberately pass a bad repo URL, kill the network mid-query, and request a file that does not exist. Fix what you see.
