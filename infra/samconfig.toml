@@ -1,0 +1,22 @@
+# Committed so all three of us deploy identically.
+# Usage, from this directory: sam build && sam deploy
+
+version = 0.1
+
+[default.global.parameters]
+stack_name = "dune"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+region = "ap-south-1"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false
+fail_on_empty_changeset = false
+resolve_s3 = true
+
+[default.sync.parameters]
+region = "ap-south-1"
+watch = false

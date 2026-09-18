@@ -1,0 +1,132 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Dune — one template, one deploy command. Step 1 of the build order: the single
+  DynamoDB table, the repo snapshot bucket, and ApiFn behind an HTTP API.
+  Region is ap-south-1 (set in samconfig.toml).
+
+Globals:
+  Function:
+    # Node 20 was deprecated on 2026-04-30 and fails `sam validate --lint`.
+    Runtime: nodejs24.x
+    Architectures:
+      - arm64
+    MemorySize: 1024
+    Timeout: 30
+    Environment:
+      Variables:
+        NODE_OPTIONS: --enable-source-maps
+        TABLE_NAME: !Ref DuneTable
+        REPO_BUCKET: !Ref RepoBucket
+        # Claude from India goes through a global cross-Region inference profile. A plain
+        # regional model id fails, and the error is not obvious.
+        BEDROCK_MODEL_ID: global.anthropic.claude-sonnet-4-6
+        BEDROCK_EMBED_MODEL_ID: amazon.titan-embed-text-v2:0
+
+Resources:
+  # ── Storage ────────────────────────────────────────────────────────────────
+
+  # Single table. Every access pattern here is keyed by repoId, so one table and no GSIs.
+  # Key layout is in docs/01-BACKEND.md, "DynamoDB design".
+  DuneTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: dune
+      # On-demand: no capacity planning, scales to zero between demos.
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      # Job records expire after 7 days, which keeps the table clean without a cleanup job.
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+
+  # Repo snapshots. Objects are deleted after 7 days; there is nothing here worth keeping
+  # longer than the weekend.
+  RepoBucket:
+    Type: AWS::S3::Bucket
+    # The stack is torn down after the hackathon. Note that CloudFormation cannot delete a
+    # bucket that still holds objects — empty it first if a teardown fails.
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      # Bucket names are globally unique, so the account id is appended. The deployed name
+      # is in the stack outputs and is passed to the functions as REPO_BUCKET.
+      BucketName: !Sub 'dune-repos-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-snapshots
+            Status: Enabled
+            ExpirationInDays: 7
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+
+  # ── API ────────────────────────────────────────────────────────────────────
+
+  # HTTP API rather than REST API: cheaper, simpler, and enough for this.
+  # CORS is wide open for the weekend — the frontend and the API are on different domains
+  # and origin configuration is not where the time goes. The Lambda does not set CORS
+  # headers itself; duplicating them here and there is what breaks the browser.
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowHeaders:
+          - '*'
+        AllowMethods:
+          - '*'
+
+  # One function holds every handler and routes internally. Fewer cold starts, one deploy,
+  # one set of permissions. At this scale there is no reason to split it.
+  ApiFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../packages/api
+      Handler: index.handler
+      Description: Dune HTTP API — all handlers, internal routing.
+      Policies:
+        # Bedrock and states:StartExecution are added when the steps that need them land.
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DuneTable
+      Events:
+        # Everything reaches the router. Unknown paths come back as a NOT_FOUND in the
+        # standard error envelope rather than an API Gateway error page.
+        AnyRoute:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /{proxy+}
+            Method: ANY
+    Metadata:
+      BuildMethod: makefile
+
+Outputs:
+  ApiUrl:
+    Description: Base URL of the HTTP API. Health check is GET {ApiUrl}/v1/health.
+    Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com'
+  TableName:
+    Description: DynamoDB table name (TABLE_NAME).
+    Value: !Ref DuneTable
+  RepoBucketName:
+    Description: S3 bucket holding repo snapshots (REPO_BUCKET).
+    Value: !Ref RepoBucket

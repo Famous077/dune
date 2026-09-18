@@ -1,0 +1,21 @@
+{
+  "name": "@dune/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Types and zod schemas shared by the API, the indexer, the MCP server and the web app.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./schema": "./src/schema.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

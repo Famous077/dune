@@ -1,0 +1,24 @@
+{
+  "name": "dune",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Know where you are in any codebase.",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "index": "esbuild packages/indexer/src/run-local.ts --bundle --platform=node --format=cjs --external:web-tree-sitter --sourcemap --log-level=warning --outfile=node_modules/.cache/dune/index-repo.cjs && node --enable-source-maps --env-file-if-exists=.env node_modules/.cache/dune/index-repo.cjs",
+    "build": "cd infra && sam build",
+    "deploy": "cd infra && sam deploy",
+    "clean": "rm -rf infra/.aws-sam packages/*/dist packages/*/*.tsbuildinfo"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.0"
+  }
+}

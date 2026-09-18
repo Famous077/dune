@@ -1,0 +1,21 @@
+{
+  "name": "@dune/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lambda handlers behind API Gateway. One function, internal routing.",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1135.0",
+    "@aws-sdk/lib-dynamodb": "^3.1135.0",
+    "@dune/shared": "*",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.163",
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.0"
+  }
+}

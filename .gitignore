@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# SAM build output
+.aws-sam/
+
+# never commit env files — the parser skips them and so does the repo
+.env
+.env.*
+!.env.example
+
+# local AWS / editor noise
+.DS_Store
+*.log

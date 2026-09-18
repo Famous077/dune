@@ -1,0 +1,13 @@
+{
+  "name": "@dune/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server on App Runner. A thin wrapper over the HTTP API.",
+  "type": "module",
+  "dependencies": {
+    "@dune/shared": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}
