@@ -1,4 +1,4 @@
-# Bearings
+# Dune
 
 Know where you are in any codebase.
 
@@ -73,9 +73,10 @@ queries, team knowledge layer, git-aware suggestion drafting, context export, MC
 **Deliberately out of scope:** languages beyond TypeScript and JS, multiple repos, auth
 and accounts, code generation, real-time collaboration. See the roadmap in `00-PRD.md`.
 
-## Open
+## Demo repo
 
-- Demo repo: pin one mid-size TypeScript repo and record the commit SHA here.
+Split-it-Wise, pinned at `07aeab28ff5ee49cc7fc948c8cc076a1930945bd`.
+167 JS/JSX/TS/TSX files. Used for all development and the demo video.
 
 ## Team
 

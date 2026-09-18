@@ -1,6 +1,6 @@
 # 03 — API contract
 
-Bearings · CloudSmiths · First Commit (AWS x WeMakeDevs)
+Dune · CloudSmiths · First Commit (AWS x WeMakeDevs)
 
 Authoritative. If any other doc disagrees with this one, this one wins. Frozen Thursday; changes need both sides to agree.
 
@@ -9,7 +9,7 @@ Authoritative. If any other doc disagrees with this one, this one wins. Frozen T
 ### Base
 
 ```
-Production:  https://api.bearings.<domain>/v1
+Production:  https://api.dune.<domain>/v1
 Local:       http://localhost:3000/v1
 ```
 

@@ -1,6 +1,6 @@
 # 01 — Backend build spec
 
-Bearings · CloudSmiths · First Commit (AWS x WeMakeDevs)
+Dune · CloudSmiths · First Commit (AWS x WeMakeDevs)
 
 Owner: Akshat. Written to be handed to Claude Code as implementation context.
 
@@ -10,13 +10,13 @@ This doc covers everything behind the API: indexing, storage, retrieval, generat
 
 ### Stack
 
-- **Runtime:** Node.js 20, TypeScript throughout
+- **Runtime:** Node.js 24, TypeScript throughout. Lambda deprecated the Node 20 runtime on 2026-04-30.
 - **Parsing:** `web-tree-sitter` with WASM grammars for TypeScript and TSX. Not the native `tree-sitter` bindings — native modules mean compiling for the Lambda runtime and that is a time sink we are not paying for.
 - **Orchestration:** AWS Step Functions for the indexing pipeline
 - **Compute:** Lambda for API handlers and pipeline steps; App Runner for the MCP server only
 - **Storage:** S3 for repo snapshots, DynamoDB for graph, metadata, chunks and context
 - **Vectors:** start with embeddings stored in DynamoDB and cosine similarity computed in the query Lambda. Only move to OpenSearch Serverless if measured retrieval time exceeds 1 second on the demo repo.
-- **LLM:** Amazon Bedrock, Claude Sonnet via global cross-Region inference profile
+- **Embeddings and generation:** both behind provider interfaces. The default embedder is local — `@xenova/transformers` running `all-MiniLM-L6-v2` in-process — so indexing needs no model access at all. The Bedrock implementations (Claude Sonnet via the global cross-Region inference profile, Titan for embeddings) stay documented as the alternative path, used if access arrives. Bedrock is optional for this hackathon; deploying on AWS is the only requirement.
 - **IaC:** AWS SAM. One template, one deploy command.
 
 ### Non-negotiables
@@ -42,7 +42,7 @@ Build in this order and do not skip ahead. Each step should be verifiable on its
 One repo, two deployable units (API stack and MCP service), shared types.
 
 ```
-bearings/
+dune/
   docs/                      # all specs, this doc included
   packages/
     shared/                  # types shared by everything
@@ -101,7 +101,7 @@ Generates `repoId` as a hash of the normalised repo URL, so re-indexing the same
 
 **In:** `{ repoId, repoUrl }` **Out:** `{ repoId, s3Prefix, fileList[] }`
 
-Shallow clone (`--depth 1`) into `/tmp`, then upload the working tree to `s3://bearings-repos/{repoId}/`. Pin to a commit SHA and record it.
+Shallow clone (`--depth 1`) into `/tmp`, then upload the working tree to `s3://dune-repos/{repoId}/`. Pin to a commit SHA and record it.
 
 Filters applied while walking the tree, in this order:
 
@@ -160,20 +160,22 @@ The goal is a **module-level graph**, not full semantic analysis. Resist the urg
 ### Setup
 
 ```ts
-import Parser from 'web-tree-sitter';
+import { Language, Parser } from 'web-tree-sitter';
 
 await Parser.init();
 const parser = new Parser();
-const TS = await Parser.Language.load('tree-sitter-typescript.wasm');
-const TSX = await Parser.Language.load('tree-sitter-tsx.wasm');
+const TS = await Language.load('tree-sitter-typescript.wasm');
+const TSX = await Language.load('tree-sitter-tsx.wasm');
 // .ts -> TS grammar, .tsx/.jsx -> TSX grammar, .js -> TSX grammar (handles flow-ish syntax)
 ```
 
 Bundle the `.wasm` files into the Lambda package. Do not fetch them at runtime.
 
+Take the grammars from `@vscode/tree-sitter-wasm`. The obvious package, `tree-sitter-wasms`, is built against the tree-sitter 0.20 ABI and fails to load in web-tree-sitter 0.27 with an opaque dylink error.
+
 ### What to extract per file
 
-**Imports.** From `import_statement` nodes: the module specifier and the imported names. Resolve relative specifiers to repo-relative paths, applying the usual resolution order (`.ts`, `.tsx`, `.js`, `/index.ts`). Record bare specifiers as external dependencies without resolving them.
+**Imports.** From `import_statement` nodes: the module specifier and the imported names. Resolve relative specifiers to repo-relative paths, applying the usual resolution order (`.ts`, `.tsx`, `.js`, `/index.ts`). Also resolve path aliases from the repo's `tsconfig.json` or `jsconfig.json` (`baseUrl` and `paths`): a Next.js repo leans on `@/*`, and without alias resolution most internal imports resolve to nothing and the graph comes out as a field of unconnected nodes. Record bare specifiers as external dependencies without resolving them.
 
 **Exports.** From `export_statement` nodes: exported symbol names and whether the export is default.
 
@@ -249,7 +251,12 @@ The metadata matters as much as the vector. Retrieval filters and re-ranks on it
 
 ### Embedding
 
-Use Bedrock's Titan embeddings (`amazon.titan-embed-text-v2:0`) — cheap, fast, available in region, and good enough at this scale. Batch roughly 50 chunks per call.
+Embedding sits behind an `Embedder` interface — an `id`, a `dimension`, and `embed(texts)` returning one vector per text. Two implementations:
+
+- **`LocalEmbedder`**, the default. `@xenova/transformers` running `all-MiniLM-L6-v2` in-process, 384 dimensions. No model access, no per-call cost, and fast enough at this scale.
+- **`TitanEmbedder`**, the Bedrock path. `amazon.titan-embed-text-v2:0`, 1,024 dimensions — cheap, fast and available in region once access is granted. Batch roughly 50 chunks per call.
+
+**The dimension differs between the two, so their vectors are not comparable.** Every stored vector set records the embedder id and the dimension that produced it, and retrieval refuses one whose embedder does not match the one embedding the question. Without that record a switch silently computes cosine similarity across two incompatible spaces and quietly returns nonsense, which is the worst kind of bug to find on Saturday. Changing embedder means re-indexing.
 
 Embed the chunk content **prefixed with its path and symbol name**. `src/routes/auth.ts :: loginHandler` followed by the source retrieves noticeably better than bare source, because path tokens carry real signal for these questions.
 
@@ -263,7 +270,7 @@ To keep the load cheap, store vectors in a single item per repo as a packed bina
 
 ## DynamoDB design
 
-Single table, `bearings`. Single-table design because every access pattern here is keyed by `repoId` and we do not want five tables to provision and clean up.
+Single table, `dune`. Single-table design because every access pattern here is keyed by `repoId` and we do not want five tables to provision and clean up.
 
 ### Keys
 
@@ -331,9 +338,11 @@ Put team context first in the prompt, not last. It is the highest-value, lowest-
 
 Friday evening is for this. Run `scripts/eval.ts`, look at which of the ten questions fail, and inspect what was retrieved rather than what was generated. Almost every wrong answer this weekend will be a retrieval failure, not a generation failure. Fix retrieval first; change the prompt only when the right context was present and the model still got it wrong.
 
-## Bedrock call
+## Generation
 
-### Model and region
+The generation provider is not yet decided. It sits behind a `Generator` interface that takes the assembled context and the question and returns a validated `Answer`; Bedrock is one implementation of it, and anything else that can be forced to fill a schema drops in behind the same interface. Everything below the model subsection — prompt structure, schema enforcement, the anti-hallucination check and the confidence rules — is provider-independent and does not change with the choice.
+
+### Model and region, on the Bedrock path
 
 Use the global cross-Region inference profile, which is how Claude models are reachable from India:
 
@@ -342,7 +351,7 @@ modelId: 'global.anthropic.claude-sonnet-4-6'
 region:  'ap-south-1'
 ```
 
-Check model access in the Bedrock console on Thursday, first hour. Access is requested per account and is not instant. This is the one blocker that cannot be worked around late.
+Check model access in the Bedrock console. Access is requested per account and is not instant; ours is blocked with a support case pending, which is why the default embedder is local and generation is behind an interface rather than the pipeline waiting on it.
 
 Fall back to Haiku 4.5 if latency is a problem. Test both against the eval set before deciding — cheaper and faster may be good enough here, since the reasoning load is modest once retrieval is right.
 
@@ -425,7 +434,7 @@ Built last. Dropped without discussion if the core is not solid by Saturday nigh
 
 ### Prerequisites
 
-- Node 20
+- Node 24
 - AWS CLI configured, SAM CLI installed
 - Bedrock model access approved on the account (check this first, see the Bedrock section)
 
@@ -448,8 +457,8 @@ sam build && sam deploy      # deploy everything
 AWS_REGION=ap-south-1
 BEDROCK_MODEL_ID=global.anthropic.claude-sonnet-4-6
 BEDROCK_EMBED_MODEL_ID=amazon.titan-embed-text-v2:0
-TABLE_NAME=bearings
-REPO_BUCKET=bearings-repos
+TABLE_NAME=dune
+REPO_BUCKET=dune-repos
 ```
 
 Never commit a `.env`. The parser skips them for a reason and so should the repo.

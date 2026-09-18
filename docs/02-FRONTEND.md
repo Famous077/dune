@@ -1,6 +1,6 @@
 # 02 — Frontend build spec
 
-Bearings · CloudSmiths · First Commit (AWS x WeMakeDevs)
+Dune · CloudSmiths · First Commit (AWS x WeMakeDevs)
 
 Owners: the two frontend builders. Read `03-API.md` alongside this.
 
@@ -39,7 +39,7 @@ Best UI is a separate ₹1,00,000 prize and the same submission is automatically
 
 ### The character
 
-**A technical instrument, not a marketing site.** Bearings shows a developer where they are in a codebase. It should feel like a precise tool: dense where density helps, quiet everywhere else, with nothing on screen that is not carrying information.
+**A technical instrument, not a marketing site.** Dune shows a developer where they are in a codebase. It should feel like a precise tool: dense where density helps, quiet everywhere else, with nothing on screen that is not carrying information.
 
 The reference points are a good terminal, a well-made IDE panel, a flight instrument. Not a SaaS landing page, not a dashboard full of cards with big numbers.
 
@@ -159,7 +159,7 @@ The first thing a judge sees. It has one job and should look like it has one job
 Centred column, max-width 560px, vertically centred in the viewport.
 
 ```
-            Bearings
+            Dune
             Know where you are in any codebase.
 
   ┌────────────────────────────────────────────┐
@@ -228,7 +228,7 @@ The main screen. This is where the demo spends most of its time, so it gets the 
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ Bearings   owner/repo   412 files              Context  ⌘K   │  ← 48px bar
+│ Dune   owner/repo   412 files                  Context  ⌘K   │  ← 48px bar
 ├───────────────────────────────────────┬──────────────────────┤
 │                                       │                      │
 │                                       │   Ask where a        │
@@ -456,7 +456,7 @@ Bottom left, minimal: zoom in, zoom out, fit to view. No minimap — the graph i
 
 ### Performance guard
 
-Above 300 nodes, render only nodes with at least one edge and show a small line: `showing 287 of 412 files; isolated files hidden`. Isolated files are almost always config and type-only modules and they add nothing to the picture.
+Isolated nodes never reach the frontend: the backend always excludes them and reports how many in `hiddenCount`, per `03-API.md`. Render that count as a small line: `showing 287 of 412 files; isolated files hidden`. Isolated files are almost always config and type-only modules and they add nothing to the picture.
 
 ### The fallback
 

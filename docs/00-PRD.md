@@ -1,4 +1,4 @@
-# 00 — Product requirements: Bearings
+# 00 — Product requirements: Dune
 
 First Commit · WeMakeDevs x AWS · Ship It track · Sept 17–20, 2026
 
@@ -57,7 +57,7 @@ One line: **existing tools give one developer a private memory of code. We give 
 
 ## What we are building
 
-**Bearings is a shared brain for a repo. Point it at your codebase and it answers two questions for everyone on the team: where does this change belong, and what have we already figured out about this code.**
+**Dune is a shared brain for a repo. Point it at your codebase and it answers two questions for everyone on the team: where does this change belong, and what have we already figured out about this code.**
 
 It is not a code generator and not another chat window. It sits one step before those. It gives you, or your agent, the engineering context needed to make a change correctly, and it keeps that context after you make it.
 
@@ -120,7 +120,7 @@ Repo URL comes in through API Gateway, a Lambda registers the job and drops it o
 | Repo storage | S3 | Snapshots, cheap, nothing to manage |
 | Graph and metadata | DynamoDB | Single-digit ms lookups on file and symbol keys, on-demand billing |
 | Vectors | Start in-memory / DynamoDB, move to OpenSearch Serverless only if needed | For a single mid-size repo the OpenSearch setup cost may outweigh the benefit; we measure before adding it |
-| LLM | Bedrock, Claude via Global cross-Region inference | Confirmed available to ap-south-1 and ap-south-2 through global inference profiles, for example global.anthropic.claude-sonnet-4-6. Large context window helps when feeding graph plus chunks |
+| Embeddings and generation | Embeddings run locally (all-MiniLM-L6-v2); generation sits behind a provider interface | Bedrock is optional for this hackathon and our model access is still pending, so nothing waits on it. Bedrock with Claude via Global cross-Region inference, for example global.anthropic.claude-sonnet-4-6, is the intended path once access is granted; its large context window helps when feeding graph plus chunks |
 | Frontend | Amplify Hosting | URL in minutes, which is the Ship It requirement |
 | MCP server | App Runner | MCP remote transport holds long-lived SSE connections, which fits App Runner better than Lambda |
 
@@ -296,7 +296,7 @@ Each risk has a trigger point and a decision already made, so nobody is deciding
 | Answer quality stays poor after tuning | Medium | Narrow the question types accepted. A tool that answers three kinds of question well beats one that answers anything badly. Say so in the demo. |
 | First AWS deploy eats a day | Medium | Deploy a hello-world through the full stack on Thursday night, before any real feature exists. Find the IAM and region problems early. |
 | Indexing too slow on the demo repo | Medium | Pre-index the demo repo and cache it. The video shows indexing on a small repo, the query demo runs on the cached large one. |
-| Bedrock access not enabled on the account | Low but fatal | Check on Thursday, first hour. Model access has to be requested in the console and is not instant. |
+| Bedrock access not enabled on the account | High, and already the case | Not fatal. Bedrock is optional for this hackathon, embeddings run locally and generation sits behind a provider interface, so nothing waits on access. Swap Bedrock in if the support case clears. |
 | Frontend and backend integrate late and break | High | The frozen API contract exists for this. Frontend works on dummy JSON from hour one and never blocks on the backend. |
 | MCP server eats Sunday | Medium | It is explicitly last. If core is not solid by Saturday night, it is dropped without discussion. |
 | Demo repo changes behaviour between tests | Low | Pin a commit SHA. Do not track the default branch. |
@@ -305,7 +305,7 @@ Each risk has a trigger point and a decision already made, so nobody is deciding
 
 ### The two that would actually sink us
 
-Bedrock access and the video. The first is checked in hour one. The second is protected by stopping all feature work Sunday midday. Everything else has a workable fallback.
+Answer quality and the video. The first is why the ten known-answer questions get written before prompt tuning starts: everything else can be respectable and the product still fails if it confidently names the wrong file, and without the eval every change merely feels like an improvement. The second is protected by stopping all feature work Sunday midday. Everything else has a workable fallback, Bedrock access included.
 
 ## Data handling
 
@@ -421,6 +421,6 @@ What comes after the weekend, in the order it is worth building. Showing this is
 
 ### Open questions
 
-- Name is Bearings. Check GitHub and npm availability before registering anything.
+- Name is Dune. Check GitHub and npm availability before registering anything.
 - Demo repo, to be locked Thursday night.
 - Whether simple vector search holds for a mid-size repo or OpenSearch Serverless becomes necessary. Decided by measurement on Friday, not by guessing now.

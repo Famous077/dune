@@ -1,6 +1,6 @@
 # 04 — Infra and deployment
 
-Bearings · CloudSmiths · First Commit (AWS x WeMakeDevs)
+Dune · CloudSmiths · First Commit (AWS x WeMakeDevs)
 
 Ship It track. The architecture is part of the score, so this is not just plumbing.
 
@@ -10,7 +10,9 @@ Do these before writing any feature code. Every item here is something that can 
 
 ### 1. Request Bedrock model access
 
-**This is the single highest-risk item.** Model access is requested per account in the Bedrock console and is not always instant.
+**Bedrock is optional for this hackathon.** The organizers have confirmed that model access can take a long time to come through, that projects should not wait on it, and that using other AI tools or open source models puts a project at no disadvantage for prizes. The only requirement is deploying on AWS. Our account is blocked on Anthropic model access with a support case pending, so embeddings run locally and generation sits behind a provider interface — see `01-BACKEND.md`.
+
+Request access anyway, and early: it is requested per account in the Bedrock console, it is not instant, and it is worth having if it arrives.
 
 - Console, ap-south-1, Bedrock, Model access
 - Request access to Anthropic Claude models and Amazon Titan Embeddings
@@ -55,7 +57,7 @@ One SAM template at `infra/template.yaml`. One deploy command. Region ap-south-1
 
 | Resource | Type | Notes |
 | --- | --- | --- |
-| `BearingsTable` | DynamoDB | Single table, on-demand billing, TTL on `expiresAt` |
+| `DuneTable` | DynamoDB | Single table, on-demand billing, TTL on `expiresAt` |
 | `RepoBucket` | S3 | Repo snapshots, lifecycle rule deleting objects after 7 days |
 | `IndexStateMachine` | Step Functions | Standard workflow, the indexing pipeline |
 | `CloneFn` | Lambda | 2 GB ephemeral storage, 3 GB memory, 5 min timeout |
@@ -94,7 +96,7 @@ SAM policy templates cover most of this. Write them in the template from the sta
 
 | Function | Needs |
 | --- | --- |
-| `CloneFn` | S3 write to RepoBucket, DynamoDB write to BearingsTable |
+| `CloneFn` | S3 write to RepoBucket, DynamoDB write to DuneTable |
 | `ParseFn` | S3 read, DynamoDB read and write |
 | `EmbedFn` | DynamoDB read and write, `bedrock:InvokeModel` on the embedding model |
 | `PersistFn` | DynamoDB read and write |
@@ -135,7 +137,7 @@ sam deploy --guided        # first time only, saves samconfig.toml
 sam deploy                 # every time after
 ```
 
-First run asks for stack name (`bearings`), region (`ap-south-1`), and confirms IAM capability. Commit `samconfig.toml` so all three people deploy identically.
+First run asks for stack name (`dune`), region (`ap-south-1`), and confirms IAM capability. Commit `samconfig.toml` so all three people deploy identically.
 
 ### Environments
 
@@ -167,7 +169,7 @@ Deploy is a Saturday evening task, not a Sunday one. Budget two hours and expect
 
 Things that reliably eat hours. Read this before hitting them, not after.
 
-**Bedrock model id prefix.** Claude from India goes through global inference profiles. `global.anthropic.claude-sonnet-4-6`, not `anthropic.claude-sonnet-4-6`. A plain regional id fails and the error is not obvious.
+**Bedrock model id prefix.** Bedrock is optional this weekend and our access is blocked pending a support case, so this and the gotcha below only bite once access arrives. Claude from India goes through global inference profiles. `global.anthropic.claude-sonnet-4-6`, not `anthropic.claude-sonnet-4-6`. A plain regional id fails and the error is not obvious.
 
 **Bedrock model access is a separate step from IAM.** Correct IAM permissions still fail if model access has not been granted in the console. Two different things, both required.
 
