@@ -1,0 +1,31 @@
+# Amplify Hosting build for the web app (packages/web).
+#
+# The install runs at the repo root: @dune/shared is an npm workspace package, so it only
+# resolves through the root lockfile and the root node_modules. `-w @dune/web` installs just
+# the web app's dependency tree, not the Lambda packages (ONNX runtime, sharp, the AWS SDK),
+# which the build does not need and which would slow it down.
+#
+# In the console, the app must be connected as a monorepo with root `packages/web`, which
+# matches `appRoot` below. VITE_API_URL and VITE_USE_MOCKS come from the console's
+# environment variables and are baked in at build time.
+version: 1
+applications:
+  - appRoot: packages/web
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            # The repo requires Node 24 (root package.json engines).
+            - nvm install 24 && nvm use 24
+            - node -v && npm -v
+            # A missing API address would build a site that cannot reach anything.
+            - test -n "$VITE_API_URL" || (echo "VITE_API_URL is not set in the Amplify environment variables" && exit 1)
+            - cd ../.. && npm ci -w @dune/web --include-workspace-root=false
+        build:
+          commands:
+            - nvm use 24
+            - npm run build
+      artifacts:
+        baseDirectory: dist
+        files:
+          - '**/*'
