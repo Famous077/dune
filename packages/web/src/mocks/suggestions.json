@@ -1,0 +1,26 @@
+[
+  {
+    "id": "sug_mock0001_1",
+    "type": "dead-end",
+    "title": "Passport.js was removed from auth.ts",
+    "body": "Commit e71f3a2 removed passport imports and strategy initializers. Record architectural reason for future team context.",
+    "files": [
+      "src/routes/auth.ts",
+      "src/middleware/auth.ts"
+    ],
+    "status": "pending",
+    "createdAt": "2026-09-18T08:30:00.000Z"
+  },
+  {
+    "id": "sug_mock0001_2",
+    "type": "decision",
+    "title": "Graph layout moved to deterministic coordinates",
+    "body": "Commit 8f31c2a replaced dynamic client calculations with pre-computed cluster coordinates in repository graph pipeline.",
+    "files": [
+      "src/services/graphService.ts",
+      "src/config/layout.ts"
+    ],
+    "status": "pending",
+    "createdAt": "2026-09-18T08:00:00.000Z"
+  }
+]

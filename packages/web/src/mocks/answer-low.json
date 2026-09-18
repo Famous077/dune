@@ -1,0 +1,44 @@
+{
+  "recommendedFile": null,
+  "attachTo": null,
+  "reason": "The request touches authentication workflows, but the graph does not establish one clear attachment point among the entry router, service layer, and middleware pipeline.",
+  "affected": [
+    "/login",
+    "/oauth/callback"
+  ],
+  "testsToUpdate": [
+    "src/routes/auth.test.ts",
+    "src/services/authService.test.ts"
+  ],
+  "sources": [
+    {
+      "file": "src/routes/auth.ts",
+      "lines": [
+        15,
+        38
+      ]
+    },
+    {
+      "file": "src/services/authService.ts",
+      "lines": [
+        42,
+        76
+      ]
+    }
+  ],
+  "confidence": "low",
+  "candidates": [
+    {
+      "file": "src/routes/auth.ts",
+      "reason": "Every auth route is registered on this router, if only auth needs the change"
+    },
+    {
+      "file": "src/middleware/auth.ts",
+      "reason": "Where other cross-cutting auth middleware already lives"
+    },
+    {
+      "file": "src/services/authService.ts",
+      "reason": "If the change belongs to the domain logic rather than the transport"
+    }
+  ]
+}

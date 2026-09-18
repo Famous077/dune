@@ -1,0 +1,11 @@
+{
+  "repoId": "mock0001",
+  "repoUrl": "https://github.com/acme/payments-api",
+  "name": "acme/payments-api",
+  "commitSha": "8f31c2a9d4e71b0c6f2a5e38d91b7c04a6e2f150",
+  "fileCount": 412,
+  "lineCount": 38204,
+  "truncated": false,
+  "parseFailures": 2,
+  "indexedAt": "2026-09-18T08:30:00Z"
+}

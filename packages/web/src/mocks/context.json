@@ -1,0 +1,74 @@
+[
+  {
+    "id": "ctx_mock1",
+    "repoId": "mock0001",
+    "type": "decision",
+    "title": "Use JWT middleware for authentication",
+    "body": "Replaced session-based cookies with signed RS256 JWT tokens verified at edge middleware. Centralized claims verification in src/middleware/auth.ts to decouple auth state from database lookups on every request.",
+    "files": [
+      "src/middleware/auth.ts"
+    ],
+    "authoredBy": "human",
+    "createdAt": "2026-09-18T07:00:00.000Z"
+  },
+  {
+    "id": "ctx_mock2",
+    "repoId": "mock0001",
+    "type": "decision",
+    "title": "Keep API validation inside route middleware",
+    "body": "Schema validation using Zod must execute in route middleware before hitting service handlers. Prevents invalid payloads from reaching database pools and keeps service methods purely domain-focused.",
+    "files": [
+      "src/utils/validation.ts"
+    ],
+    "authoredBy": "agent",
+    "createdAt": "2026-09-17T09:00:00.000Z"
+  },
+  {
+    "id": "ctx_mock3",
+    "repoId": "mock0001",
+    "type": "decision",
+    "title": "Use DynamoDB for repository metadata",
+    "body": "Selected DynamoDB with single-table design for storing indexing jobs, symbol tables, and resolved edge partitions with sub-5ms lookup latency.",
+    "files": [
+      "src/config/database.ts"
+    ],
+    "authoredBy": "human",
+    "createdAt": "2026-09-15T09:00:00.000Z"
+  },
+  {
+    "id": "ctx_mock4",
+    "repoId": "mock0001",
+    "type": "dead-end",
+    "title": "Passport.js removed from auth architecture",
+    "body": "Passport.js was tested and removed because it conflicted with the existing session architecture and introduced serialization bottlenecks on concurrent WebSocket handshake upgrades.",
+    "files": [
+      "src/routes/auth.ts"
+    ],
+    "authoredBy": "human",
+    "createdAt": "2026-09-14T09:00:00.000Z"
+  },
+  {
+    "id": "ctx_mock5",
+    "repoId": "mock0001",
+    "type": "dead-end",
+    "title": "Client-side D3 force graph layout rejected",
+    "body": "Client-side dynamic force simulations caused significant jank and layout jumping on graphs with >200 nodes. All node coordinates are now deterministically computed during indexing and rendered static-first.",
+    "files": [
+      "src/app.ts"
+    ],
+    "authoredBy": "agent",
+    "createdAt": "2026-09-11T09:00:00.000Z"
+  },
+  {
+    "id": "ctx_mock6",
+    "repoId": "mock0001",
+    "type": "constraint",
+    "title": "Node.js runtime must remain Node 20",
+    "body": "AWS Lambda production execution environments and native cryptokey bindings require exact Node.js 20.x runtime parity. Do not introduce ESM-only libraries that fail under CJS bundling target.",
+    "files": [
+      "package.json"
+    ],
+    "authoredBy": "human",
+    "createdAt": "2026-09-04T09:00:00.000Z"
+  }
+]

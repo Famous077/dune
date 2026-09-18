@@ -1,0 +1,199 @@
+@import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
+
+@layer base {
+  :root {
+    --sky-deep: #0A0B14;
+    --sky-mid: #171833;
+    --dune-far: #241C2E;
+    --dune-mid: #3A2B33;
+    --dune-near: #57392C;
+    --sand: #C89B6B;
+    --moon: #F0DFB4;
+    --ink: #EAE2D4;
+    --font-serif: 'Fraunces', Georgia, serif;
+    --font-mono: 'IBM Plex Mono', Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  }
+
+  body {
+    background-color: var(--sky-deep);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+  }
+}
+
+.font-serif-dune {
+  font-family: var(--font-serif);
+}
+
+.font-mono-dune {
+  font-family: var(--font-mono);
+}
+
+/* Custom minimal scrollbar with sand accent */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0A0B14;
+}
+::-webkit-scrollbar-thumb {
+  background: #3A2B33;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #57392C;
+}
+
+/* Caravan traversal keyframe */
+@keyframes caravanCrossing {
+  0% {
+    transform: translateX(110%);
+  }
+  100% {
+    transform: translateX(-160%);
+  }
+}
+
+.animate-caravan {
+  animation: caravanCrossing 48s linear infinite;
+}
+
+/* Star twinkle */
+@keyframes starTwinkle {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.1);
+  }
+}
+
+.animate-twinkle {
+  animation: starTwinkle 4s ease-in-out infinite;
+}
+
+/* Ambient sand drift */
+@keyframes sandDrift {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.6;
+  }
+  80% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(-180px, 40px);
+    opacity: 0;
+  }
+}
+
+.animate-sand-drift {
+  animation: sandDrift 7s linear infinite;
+}
+
+/* Sandstorm gust wipe */
+@keyframes sandstormWipe {
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 0.95;
+  }
+  80% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+.animate-sandstorm-gust {
+  animation: sandstormWipe 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Subtle glowing animation for background dune layers during AI query processing */
+@keyframes moonDunePulse {
+  0%, 100% {
+    filter: drop-shadow(0 -2px 6px rgba(240, 223, 180, 0.15));
+    opacity: 0.85;
+  }
+  50% {
+    filter: drop-shadow(0 -5px 20px rgba(240, 223, 180, 0.6)) drop-shadow(0 -1px 8px rgba(200, 155, 107, 0.35));
+    opacity: 1;
+  }
+}
+
+@keyframes moonRidgeGlow {
+  0%, 100% {
+    stroke: #C89B6B;
+    stroke-opacity: 0.65;
+    filter: drop-shadow(0 0 3px rgba(240, 223, 180, 0.25));
+  }
+  50% {
+    stroke: #F0DFB4;
+    stroke-opacity: 1;
+    filter: drop-shadow(0 0 12px rgba(240, 223, 180, 0.9)) drop-shadow(0 0 24px rgba(240, 223, 180, 0.45));
+  }
+}
+
+@keyframes moonAuraBreathe {
+  0%, 100% {
+    opacity: 0.12;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(1.02);
+  }
+}
+
+.animate-moon-pulse {
+  animation: moonDunePulse 2.8s ease-in-out infinite;
+}
+
+.animate-moon-ridge {
+  animation: moonRidgeGlow 2.8s ease-in-out infinite;
+}
+
+.animate-moon-aura {
+  animation: moonAuraBreathe 2.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-caravan,
+  .animate-twinkle,
+  .animate-sand-drift,
+  .animate-sandstorm-gust,
+  .animate-moon-pulse,
+  .animate-moon-ridge,
+  .animate-moon-aura {
+    animation: none !important;
+  }
+}
+
+/* React Flow styling overrides for neutral dev console */
+.react-flow__attribution {
+  display: none !important;
+}
+
+.react-flow__pane {
+  cursor: grab;
+}
+.react-flow__pane:active {
+  cursor: grabbing;
+}

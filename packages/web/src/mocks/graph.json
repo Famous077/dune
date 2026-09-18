@@ -1,0 +1,617 @@
+{
+  "nodes": [
+    {
+      "id": "src/server.ts",
+      "label": "server.ts",
+      "cluster": "src",
+      "kind": "entry",
+      "entryPoint": true,
+      "importedByCount": 0,
+      "importsCount": 3,
+      "x": 60,
+      "y": 140
+    },
+    {
+      "id": "src/app.ts",
+      "label": "app.ts",
+      "cluster": "src",
+      "kind": "entry",
+      "entryPoint": true,
+      "importedByCount": 1,
+      "importsCount": 6,
+      "x": 60,
+      "y": 280
+    },
+    {
+      "id": "src/routes/auth.ts",
+      "label": "auth.ts",
+      "cluster": "routes",
+      "kind": "route",
+      "entryPoint": false,
+      "importedByCount": 1,
+      "importsCount": 4,
+      "x": 380,
+      "y": 80
+    },
+    {
+      "id": "src/routes/users.ts",
+      "label": "users.ts",
+      "cluster": "routes",
+      "kind": "route",
+      "entryPoint": false,
+      "importedByCount": 1,
+      "importsCount": 3,
+      "x": 380,
+      "y": 220
+    },
+    {
+      "id": "src/routes/payments.ts",
+      "label": "payments.ts",
+      "cluster": "routes",
+      "kind": "route",
+      "entryPoint": false,
+      "importedByCount": 1,
+      "importsCount": 4,
+      "x": 380,
+      "y": 360
+    },
+    {
+      "id": "src/routes/health.ts",
+      "label": "health.ts",
+      "cluster": "routes",
+      "kind": "route",
+      "entryPoint": false,
+      "importedByCount": 1,
+      "importsCount": 2,
+      "x": 380,
+      "y": 500
+    },
+    {
+      "id": "src/middleware/rateLimiter.ts",
+      "label": "rateLimiter.ts",
+      "cluster": "middleware",
+      "kind": "util",
+      "entryPoint": false,
+      "importedByCount": 2,
+      "importsCount": 3,
+      "x": 720,
+      "y": 60
+    },
+    {
+      "id": "src/middleware/auth.ts",
+      "label": "auth.ts",
+      "cluster": "middleware",
+      "kind": "util",
+      "entryPoint": false,
+      "importedByCount": 2,
+      "importsCount": 3,
+      "x": 720,
+      "y": 180
+    },
+    {
+      "id": "src/middleware/validate.ts",
+      "label": "validate.ts",
+      "cluster": "middleware",
+      "kind": "util",
+      "entryPoint": false,
+      "importedByCount": 2,
+      "importsCount": 1,
+      "x": 720,
+      "y": 300
+    },
+    {
+      "id": "src/middleware/errorHandler.ts",
+      "label": "errorHandler.ts",
+      "cluster": "middleware",
+      "kind": "util",
+      "entryPoint": false,
+      "importedByCount": 1,
+      "importsCount": 2,
+      "x": 720,
+      "y": 420
+    },
+    {
+      "id": "src/middleware/requestLogger.ts",
+      "label": "requestLogger.ts",
+      "cluster": "middleware",
+      "kind": "util",
+      "entryPoint": false,
+      "importedByCount": 1,
+      "importsCount": 1,
+      "x": 720,
+      "y": 540
+    },
+    {
+      "id": "src/services/authService.ts",
+      "label": "authService.ts",
+      "cluster": "services",
+      "kind": "service",
+      "entryPoint": false,
+      "importedByCount": 1,
+      "importsCount": 6,
+      "x": 1080,
+      "y": 60
+    },
+    {
+      "id": "src/services/userService.ts",
+      "label": "userService.ts",
+      "cluster": "services",
+      "kind": "service",
+      "entryPoint": false,
+      "importedByCount": 1,
+      "importsCount": 3,
+      "x": 1080,
+      "y": 180
+    },
+    {
+      "id": "src/services/paymentService.ts",
+      "label": "paymentService.ts",
+      "cluster": "services",
+      "kind": "service",
+      "entryPoint": false,
+      "importedByCount": 1,
+      "importsCount": 4,
+      "x": 1080,
+      "y": 300
+    },
+    {
+      "id": "src/services/tokenService.ts",
+      "label": "tokenService.ts",
+      "cluster": "services",
+      "kind": "service",
+      "entryPoint": false,
+      "importedByCount": 2,
+      "importsCount": 2,
+      "x": 1080,
+      "y": 420
+    },
+    {
+      "id": "src/services/emailService.ts",
+      "label": "emailService.ts",
+      "cluster": "services",
+      "kind": "service",
+      "entryPoint": false,
+      "importedByCount": 1,
+      "importsCount": 2,
+      "x": 1080,
+      "y": 540
+    },
+    {
+      "id": "src/services/graphService.ts",
+      "label": "graphService.ts",
+      "cluster": "services",
+      "kind": "service",
+      "entryPoint": false,
+      "importedByCount": 0,
+      "importsCount": 0,
+      "x": 1080,
+      "y": 660
+    },
+    {
+      "id": "src/models/User.ts",
+      "label": "User.ts",
+      "cluster": "models",
+      "kind": "model",
+      "entryPoint": false,
+      "importedByCount": 3,
+      "importsCount": 1,
+      "x": 1440,
+      "y": 60
+    },
+    {
+      "id": "src/models/Session.ts",
+      "label": "Session.ts",
+      "cluster": "models",
+      "kind": "model",
+      "entryPoint": false,
+      "importedByCount": 2,
+      "importsCount": 1,
+      "x": 1440,
+      "y": 180
+    },
+    {
+      "id": "src/models/Payment.ts",
+      "label": "Payment.ts",
+      "cluster": "models",
+      "kind": "model",
+      "entryPoint": false,
+      "importedByCount": 1,
+      "importsCount": 1,
+      "x": 1440,
+      "y": 300
+    },
+    {
+      "id": "src/models/AuditLog.ts",
+      "label": "AuditLog.ts",
+      "cluster": "models",
+      "kind": "model",
+      "entryPoint": false,
+      "importedByCount": 2,
+      "importsCount": 1,
+      "x": 1440,
+      "y": 420
+    },
+    {
+      "id": "src/models/ApiKey.ts",
+      "label": "ApiKey.ts",
+      "cluster": "models",
+      "kind": "model",
+      "entryPoint": false,
+      "importedByCount": 1,
+      "importsCount": 1,
+      "x": 1440,
+      "y": 540
+    },
+    {
+      "id": "src/utils/logger.ts",
+      "label": "logger.ts",
+      "cluster": "utils",
+      "kind": "util",
+      "entryPoint": false,
+      "importedByCount": 5,
+      "importsCount": 0,
+      "x": 720,
+      "y": 720
+    },
+    {
+      "id": "src/utils/validation.ts",
+      "label": "validation.ts",
+      "cluster": "utils",
+      "kind": "util",
+      "entryPoint": false,
+      "importedByCount": 3,
+      "importsCount": 0,
+      "x": 380,
+      "y": 720
+    },
+    {
+      "id": "src/utils/crypto.ts",
+      "label": "crypto.ts",
+      "cluster": "utils",
+      "kind": "util",
+      "entryPoint": false,
+      "importedByCount": 2,
+      "importsCount": 0,
+      "x": 1080,
+      "y": 780
+    },
+    {
+      "id": "src/utils/metrics.ts",
+      "label": "metrics.ts",
+      "cluster": "utils",
+      "kind": "util",
+      "entryPoint": false,
+      "importedByCount": 3,
+      "importsCount": 0,
+      "x": 1440,
+      "y": 680
+    },
+    {
+      "id": "src/config/database.ts",
+      "label": "database.ts",
+      "cluster": "config",
+      "kind": "util",
+      "entryPoint": false,
+      "importedByCount": 7,
+      "importsCount": 1,
+      "x": 1780,
+      "y": 140
+    },
+    {
+      "id": "src/config/env.ts",
+      "label": "env.ts",
+      "cluster": "config",
+      "kind": "util",
+      "entryPoint": false,
+      "importedByCount": 4,
+      "importsCount": 0,
+      "x": 60,
+      "y": 420
+    },
+    {
+      "id": "src/config/redis.ts",
+      "label": "redis.ts",
+      "cluster": "config",
+      "kind": "util",
+      "entryPoint": false,
+      "importedByCount": 2,
+      "importsCount": 0,
+      "x": 1780,
+      "y": 280
+    },
+    {
+      "id": "src/config/aws.ts",
+      "label": "aws.ts",
+      "cluster": "config",
+      "kind": "util",
+      "entryPoint": false,
+      "importedByCount": 2,
+      "importsCount": 1,
+      "x": 1780,
+      "y": 420
+    }
+  ],
+  "edges": [
+    {
+      "from": "src/server.ts",
+      "to": "src/app.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/server.ts",
+      "to": "src/config/env.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/server.ts",
+      "to": "src/utils/logger.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/app.ts",
+      "to": "src/routes/auth.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/app.ts",
+      "to": "src/routes/users.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/app.ts",
+      "to": "src/routes/payments.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/app.ts",
+      "to": "src/routes/health.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/app.ts",
+      "to": "src/middleware/errorHandler.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/app.ts",
+      "to": "src/middleware/requestLogger.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/routes/auth.ts",
+      "to": "src/middleware/rateLimiter.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/routes/auth.ts",
+      "to": "src/services/authService.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/routes/auth.ts",
+      "to": "src/middleware/validate.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/routes/auth.ts",
+      "to": "src/utils/validation.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/routes/users.ts",
+      "to": "src/middleware/auth.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/routes/users.ts",
+      "to": "src/services/userService.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/routes/users.ts",
+      "to": "src/utils/validation.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/routes/payments.ts",
+      "to": "src/middleware/auth.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/routes/payments.ts",
+      "to": "src/middleware/rateLimiter.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/routes/payments.ts",
+      "to": "src/services/paymentService.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/routes/payments.ts",
+      "to": "src/middleware/validate.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/routes/health.ts",
+      "to": "src/config/database.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/routes/health.ts",
+      "to": "src/config/redis.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/middleware/rateLimiter.ts",
+      "to": "src/config/redis.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/middleware/rateLimiter.ts",
+      "to": "src/utils/logger.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/middleware/rateLimiter.ts",
+      "to": "src/utils/metrics.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/middleware/auth.ts",
+      "to": "src/services/tokenService.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/middleware/auth.ts",
+      "to": "src/models/ApiKey.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/middleware/auth.ts",
+      "to": "src/models/Session.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/middleware/validate.ts",
+      "to": "src/utils/validation.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/middleware/errorHandler.ts",
+      "to": "src/utils/logger.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/middleware/errorHandler.ts",
+      "to": "src/utils/metrics.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/middleware/requestLogger.ts",
+      "to": "src/utils/logger.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/authService.ts",
+      "to": "src/models/User.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/authService.ts",
+      "to": "src/models/Session.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/authService.ts",
+      "to": "src/services/tokenService.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/authService.ts",
+      "to": "src/services/emailService.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/authService.ts",
+      "to": "src/utils/crypto.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/authService.ts",
+      "to": "src/models/AuditLog.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/userService.ts",
+      "to": "src/models/User.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/userService.ts",
+      "to": "src/config/database.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/userService.ts",
+      "to": "src/models/AuditLog.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/paymentService.ts",
+      "to": "src/models/Payment.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/paymentService.ts",
+      "to": "src/models/User.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/paymentService.ts",
+      "to": "src/utils/metrics.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/paymentService.ts",
+      "to": "src/config/aws.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/tokenService.ts",
+      "to": "src/config/env.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/tokenService.ts",
+      "to": "src/utils/crypto.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/emailService.ts",
+      "to": "src/config/aws.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/services/emailService.ts",
+      "to": "src/utils/logger.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/models/User.ts",
+      "to": "src/config/database.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/models/Session.ts",
+      "to": "src/config/database.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/models/Payment.ts",
+      "to": "src/config/database.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/models/AuditLog.ts",
+      "to": "src/config/database.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/models/ApiKey.ts",
+      "to": "src/config/database.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/config/database.ts",
+      "to": "src/config/env.ts",
+      "kind": "import"
+    },
+    {
+      "from": "src/config/aws.ts",
+      "to": "src/config/env.ts",
+      "kind": "import"
+    }
+  ],
+  "hiddenCount": 8
+}

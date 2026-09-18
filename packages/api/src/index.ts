@@ -80,6 +80,11 @@ export const handler = async (
   const method = event.requestContext.http.method;
   const path = normalisePath(event.requestContext.http.path);
 
+  // CORS preflight. The ANY /{proxy+} route sends OPTIONS here instead of letting API
+  // Gateway answer it, and a browser rejects any preflight that is not 2xx — which blocked
+  // every POST from the web app. API Gateway adds the configured CORS headers to this.
+  if (method === 'OPTIONS') return { statusCode: 204 };
+
   console.log('request', { method, path, requestId: event.requestContext.requestId });
 
   try {

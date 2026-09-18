@@ -1,0 +1,32 @@
+{
+  "recommendedFile": "src/middleware/rateLimiter.ts",
+  "attachTo": "src/routes/auth.ts",
+  "reason": "All authentication endpoints pass through this router, making it the appropriate attachment point for request-level rate limiting.",
+  "affected": [
+    "/login",
+    "/register",
+    "/forgot-password"
+  ],
+  "testsToUpdate": [
+    "src/routes/auth.test.ts",
+    "src/middleware/rateLimiter.test.ts"
+  ],
+  "sources": [
+    {
+      "file": "src/routes/auth.ts",
+      "lines": [
+        12,
+        48
+      ]
+    },
+    {
+      "file": "src/middleware/rateLimiter.ts",
+      "lines": [
+        1,
+        32
+      ]
+    }
+  ],
+  "confidence": "high",
+  "candidates": null
+}
