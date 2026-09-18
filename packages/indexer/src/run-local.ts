@@ -1,26 +1,19 @@
 /**
  * The local pipeline shortcut: `npm run index -- <repoUrl>`.
  *
- * Runs clone and parse in one process against real S3 and DynamoDB, bypassing Step
- * Functions. Step Functions' job is retries and visibility, not logic, so it is only
- * exercised on deploy.
- *
- * Today this covers step 2 of the build order — clone, parse, graph. Chunk, embed and
- * persist join it as those steps land.
+ * Runs the same pipeline IndexFn runs, in this process, against real S3 and DynamoDB.
+ * EMBEDDER selects the embedder: `local` (default) or `titan`.
  *
  *   npm run index -- https://github.com/owner/repo
- *   npm run index -- https://github.com/owner/repo --dry-run   # no AWS calls
+ *   npm run index -- https://github.com/owner/repo --dry-run   # nothing written to AWS
  */
 
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { clone } from './clone';
-import { buildGraph } from './graph';
-import { getGraph, putGraph, putRepoMeta } from './lib/db';
 import { IndexerError } from './lib/errors';
-import { parseRepo } from './parse';
+import { indexRepository } from './pipeline';
 
 interface Options {
   repoUrl: string;
@@ -34,25 +27,10 @@ function parseArgs(argv: string[]): Options {
   const repoUrl = positional[0];
 
   if (repoUrl === undefined) {
-    throw new IndexerError(
-      'INVALID_REPO_URL',
-      'Usage: npm run index -- <repoUrl> [--dry-run] [--keep]',
-    );
+    throw new IndexerError('INVALID_REPO_URL', 'Usage: npm run index -- <repoUrl> [--dry-run] [--keep]');
   }
 
-  return {
-    repoUrl,
-    dryRun: flags.has('--dry-run'),
-    keepWorkDir: flags.has('--keep'),
-  };
-}
-
-function seconds(from: number): string {
-  return `${((Date.now() - from) / 1000).toFixed(1)}s`;
-}
-
-function stage(name: string, detail: string): void {
-  console.log(`  ${name.padEnd(12)} ${detail}`);
+  return { repoUrl, dryRun: flags.has('--dry-run'), keepWorkDir: flags.has('--keep') };
 }
 
 async function main(): Promise<void> {
@@ -69,115 +47,34 @@ async function main(): Promise<void> {
 
   const workDir = await mkdtemp(path.join(os.tmpdir(), 'dune-'));
   const started = Date.now();
+  console.log('');
 
   try {
-    /* Clone ---------------------------------------------------------------- */
-    const cloneStarted = Date.now();
-    const cloned = await clone({
+    const summary = await indexRepository({
       repoUrl: options.repoUrl,
       workDir,
       bucket: options.dryRun ? null : bucket,
       region,
+      jobId: null,
+      report: async () => {},
+      log: (name, detail) => console.log(`  ${name.padEnd(12)} ${detail}`),
     });
 
-    const sourceFiles = cloned.files.filter((file) => file.parse);
-    console.log(`\nIndexing ${cloned.name}  (repoId ${cloned.repoId}, commit ${cloned.commitSha.slice(0, 7)})\n`);
-    stage(
-      'cloning',
-      `${cloned.fileCount} files kept, ${sourceFiles.length} to parse · skipped ${cloned.skipped.excludedDir} in excluded dirs, ${cloned.skipped.envFile} env, ${cloned.skipped.tooLarge} over 500 KB · ${seconds(cloneStarted)}`,
-    );
-    if (cloned.s3Prefix !== null) {
-      stage('uploading', `${cloned.uploaded} files to ${cloned.s3Prefix}`);
-    }
-    if (cloned.truncated) {
-      stage('truncated', 'more source files than the parse cap; the overflow was not parsed');
-    }
-
-    /* Parse ---------------------------------------------------------------- */
-    const parseStarted = Date.now();
-    const parsed = await parseRepo({
-      rootDir: workDir,
-      files: sourceFiles.map((file) => file.path),
-      allFiles: cloned.files.map((file) => file.path),
-    });
-
-    stage(
-      'parsing',
-      `${parsed.files.length} parsed, ${parsed.failures.length} failed, ${parsed.syntaxErrors.length} with syntax errors · ${seconds(parseStarted)}`,
-    );
-    for (const failure of parsed.failures) {
-      console.log(`               ! ${failure.path}: ${failure.reason}`);
-    }
-
-    /* Graph ---------------------------------------------------------------- */
-    const { graph, stats } = buildGraph(parsed.files);
-    stage(
-      'graph',
-      `${graph.nodes.length} nodes, ${graph.edges.length} edges, ${graph.hiddenCount} isolated files hidden`,
-    );
-    stage(
-      '',
-      `${stats.externalImports} external imports ignored, ${stats.droppedEdges} edges to non-module files dropped`,
-    );
-
-    const lineCount = parsed.files.reduce((total, file) => total + file.lineCount, 0);
-    const entryPoints = graph.nodes.filter((node) => node.entryPoint);
-    const hubs = [...graph.nodes]
-      .sort((a, b) => b.importedByCount - a.importedByCount)
-      .slice(0, 5);
-
-    /* Store ---------------------------------------------------------------- */
     if (options.dryRun) {
       const outDir = path.join(process.cwd(), 'node_modules', '.cache', 'dune');
       await mkdir(outDir, { recursive: true });
-      const outFile = path.join(outDir, `graph-${cloned.repoId}.json`);
-      await writeFile(outFile, JSON.stringify(graph, null, 2));
-      stage('dry run', `nothing written to AWS; graph JSON at ${outFile}`);
-    } else {
-      const stored = await putGraph(cloned.repoId, graph);
-      await putRepoMeta(
-        {
-          repoId: cloned.repoId,
-          repoUrl: cloned.repoUrl,
-          name: cloned.name,
-          commitSha: cloned.commitSha,
-          fileCount: cloned.fileCount,
-          lineCount,
-          truncated: cloned.truncated,
-          parseFailures: parsed.failures.length,
-          indexedAt: new Date().toISOString(),
-        },
-        {
-          s3Prefix: cloned.s3Prefix,
-          graphShardCount: stored.shardCount,
-          nodeCount: graph.nodes.length,
-          edgeCount: graph.edges.length,
-          hiddenCount: graph.hiddenCount,
-          sourceFileCount: sourceFiles.length,
-        },
-      );
-
-      stage(
-        'stored',
-        `graph in ${stored.shardCount} shard(s), ${(stored.packedBytes / 1024).toFixed(1)} KB packed · repo record written`,
-      );
-
-      // Read it straight back, so "it is in DynamoDB" is proven rather than assumed.
-      const readBack = await getGraph(cloned.repoId);
-      if (readBack === null) {
-        throw new IndexerError('INDEX_FAILED', 'The graph was written but could not be read back.');
-      }
-      stage('verified', `read back ${readBack.nodes.length} nodes, ${readBack.edges.length} edges`);
+      await writeFile(path.join(outDir, `graph-${summary.cloned.repoId}.json`), JSON.stringify(summary.graph, null, 2));
+      await writeFile(path.join(outDir, `chunks-${summary.cloned.repoId}.json`), JSON.stringify(summary.chunks, null, 2));
+      console.log(`  ${'dry run'.padEnd(12)} nothing written to AWS; graph and chunks JSON in ${outDir}`);
     }
 
-    /* Summary -------------------------------------------------------------- */
-    console.log(`\n  ${lineCount.toLocaleString()} lines across ${parsed.files.length} parsed files`);
+    const entryPoints = summary.graph.nodes.filter((node) => node.entryPoint);
+    const hubs = [...summary.graph.nodes].sort((a, b) => b.importedByCount - a.importedByCount).slice(0, 5);
+    console.log(`\n  ${summary.lineCount.toLocaleString()} lines across ${summary.parsed.files.length} parsed files`);
     console.log(`  ${entryPoints.length} entry points, for example: ${entryPoints.slice(0, 3).map((node) => node.id).join(', ')}`);
     console.log('  most depended on:');
-    for (const node of hubs) {
-      console.log(`    ${String(node.importedByCount).padStart(3)} <- ${node.id}`);
-    }
-    console.log(`\nDone in ${seconds(started)}\n`);
+    for (const node of hubs) console.log(`    ${String(node.importedByCount).padStart(3)} <- ${node.id}`);
+    console.log(`\nDone in ${((Date.now() - started) / 1000).toFixed(1)}s\n`);
   } finally {
     if (options.keepWorkDir) {
       console.log(`Working tree kept at ${workDir}`);

@@ -5,6 +5,64 @@ Description: >
   DynamoDB table, the repo snapshot bucket, and ApiFn behind an HTTP API.
   Region is ap-south-1 (set in samconfig.toml).
 
+Parameters:
+  # `npm run deploy` passes every parameter explicitly, because on an existing stack SAM
+  # keeps a parameter's previous value unless told otherwise — a changed default here would
+  # never reach the stack. The defaults below only apply to a bare first `sam deploy`; the
+  # effective values live in the deploy script in package.json, overridable from .env.
+  #
+  # Which generator answers questions. Both stay deployable; switching is a redeploy.
+  Generator:
+    Type: String
+    Default: gemini
+    AllowedValues: [gemini, groq]
+
+  # Keys are supplied at deploy time from the gitignored .env — see `npm run deploy`.
+  # NoEcho keeps them out of CloudFormation output and events. Only the selected
+  # generator's key is required; the Rules below refuse a deploy without it, rather than
+  # letting it go out blank.
+  GeminiApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+  GroqApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+
+  # Providers retire model ids regularly. When one goes, change these — no code change.
+  # A lite model: free-tier gemini-3.6-flash allows only 20 requests a day per project.
+  GeminiModel:
+    Type: String
+    Default: gemini-3.5-flash-lite
+  # Model-specific; empty leaves the model's default. `low` keeps free-tier latency down.
+  GeminiThinkingLevel:
+    Type: String
+    Default: low
+  GroqModel:
+    Type: String
+    Default: openai/gpt-oss-120b
+
+  # How much retrieved context goes to the model per question: the doc's ~30,000. The
+  # real ceiling is what the provider accepts in one request — Groq's free tier takes
+  # 8,000 tokens a minute, which is why Gemini is the default.
+  ContextTokenCap:
+    Type: Number
+    Default: 30000
+    MinValue: 1000
+
+Rules:
+  GeminiNeedsItsKey:
+    RuleCondition: !Equals [!Ref Generator, gemini]
+    Assertions:
+      - Assert: !Not [!Equals [!Ref GeminiApiKey, '']]
+        AssertDescription: Generator is gemini, so GEMINI_API_KEY must be set in .env. Deploy with npm run deploy.
+  GroqNeedsItsKey:
+    RuleCondition: !Equals [!Ref Generator, groq]
+    Assertions:
+      - Assert: !Not [!Equals [!Ref GroqApiKey, '']]
+        AssertDescription: Generator is groq, so GROQ_API_KEY must be set in .env. Deploy with npm run deploy.
+
 Globals:
   Function:
     # Node 20 was deprecated on 2026-04-30 and fails `sam validate --lint`.
@@ -104,10 +162,28 @@ Resources:
       CodeUri: ../packages/api
       Handler: index.handler
       Description: Dune HTTP API — all handlers, internal routing.
+      Environment:
+        Variables:
+          # The embedding model is bundled into the package (see packages/api/Makefile), so
+          # the embedder loads it from here and never downloads at cold start.
+          EMBED_MODEL_DIR: /var/task/models
+          GENERATOR: !Ref Generator
+          GEMINI_API_KEY: !Ref GeminiApiKey
+          GEMINI_MODEL: !Ref GeminiModel
+          GEMINI_THINKING_LEVEL: !Ref GeminiThinkingLevel
+          GROQ_API_KEY: !Ref GroqApiKey
+          GROQ_MODEL: !Ref GroqModel
+          CONTEXT_TOKEN_CAP: !Ref ContextTokenCap
+          INDEX_FUNCTION_NAME: !Ref IndexFn
       Policies:
-        # Bedrock and states:StartExecution are added when the steps that need them land.
         - DynamoDBCrudPolicy:
             TableName: !Ref DuneTable
+        # The source drawer reads files back from the snapshot.
+        - S3ReadPolicy:
+            BucketName: !Ref RepoBucket
+        # POST /v1/repos starts an index job.
+        - LambdaInvokePolicy:
+            FunctionName: !Ref IndexFn
       Events:
         # Everything reaches the router. Unknown paths come back as a NOT_FOUND in the
         # standard error envelope rather than an API Gateway error page.
@@ -117,6 +193,39 @@ Resources:
             ApiId: !Ref Api
             Path: /{proxy+}
             Method: ANY
+    Metadata:
+      BuildMethod: makefile
+
+  # The indexing pipeline, run in one invocation per job — clone, parse, chunk, embed,
+  # store. The design is a Step Functions state machine; it was dropped for the weekend
+  # (see docs/01-BACKEND.md, "Indexing pipeline"). ApiFn invokes this asynchronously and
+  # returns 202; progress reaches the client through the job record.
+  IndexFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      # Same artifact as ApiFn, different handler: see packages/api/Makefile.
+      CodeUri: ../packages/api
+      Handler: indexer.handler
+      Description: Dune indexing pipeline — one job per invocation.
+      # Memory is also CPU, and embedding is CPU-bound. The Lambda maximum run time.
+      MemorySize: 3008
+      Timeout: 900
+      # Room for a working tree in /tmp; a clone that would exceed it fails loudly.
+      EphemeralStorage:
+        Size: 2048
+      Environment:
+        Variables:
+          EMBED_MODEL_DIR: /var/task/models
+          GRAMMAR_DIR: /var/task/grammars
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DuneTable
+        - S3CrudPolicy:
+            BucketName: !Ref RepoBucket
+      # A failed job records its own failure; an automatic retry would re-run a
+      # multi-minute index behind the progress screen's back.
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
     Metadata:
       BuildMethod: makefile
 

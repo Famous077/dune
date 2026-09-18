@@ -12,7 +12,7 @@ This doc covers everything behind the API: indexing, storage, retrieval, generat
 
 - **Runtime:** Node.js 24, TypeScript throughout. Lambda deprecated the Node 20 runtime on 2026-04-30.
 - **Parsing:** `web-tree-sitter` with WASM grammars for TypeScript and TSX. Not the native `tree-sitter` bindings — native modules mean compiling for the Lambda runtime and that is a time sink we are not paying for.
-- **Orchestration:** AWS Step Functions for the indexing pipeline
+- **Orchestration:** AWS Step Functions for the indexing pipeline — dropped for the weekend; see "Indexing pipeline"
 - **Compute:** Lambda for API handlers and pipeline steps; App Runner for the MCP server only
 - **Storage:** S3 for repo snapshots, DynamoDB for graph, metadata, chunks and context
 - **Vectors:** start with embeddings stored in DynamoDB and cosine similarity computed in the query Lambda. Only move to OpenSearch Serverless if measured retrieval time exceeds 1 second on the demo repo.
@@ -87,6 +87,8 @@ dune/
 
 A Step Functions state machine. Five states, each a Lambda. Every state reads from and writes to S3 or DynamoDB, so any step can be retried independently.
 
+**What actually runs this weekend: one Lambda, no Step Functions.** `POST /repos` writes a `queued` job record and invokes `IndexFn` asynchronously; `IndexFn` runs clone, parse, chunk, embed and persist in sequence in a single invocation (3 GB, 15-minute limit, 2 GB of `/tmp`), writing the job record at every stage so `GET /repos/:repoId` can report progress. It is the same pipeline code the local runner uses. Why: a state machine is five functions, a Map state, payloads passed through S3 to stay under the 256 KB limit, and IAM for all of it — a day of plumbing whose benefits, per-step retries and execution history, matter far less at the demo's scale (a few dozen files, seconds to index) than the core features do. What is given up: a failed index is not retried step by step, and the user re-submits instead; one repo must index within 15 minutes; and a crash Lambda cannot report is detected from the outside — a job whose record has not moved for longer than the Lambda's timeout is reported as failed. The state-machine design above is still the intended shape and the pipeline steps are already separate functions, so moving back is wiring, not a rewrite.
+
 ```
 RegisterJob -> Clone -> Parse (Map) -> Embed (Map) -> Persist -> Done
 ```
@@ -101,7 +103,7 @@ Generates `repoId` as a hash of the normalised repo URL, so re-indexing the same
 
 **In:** `{ repoId, repoUrl }` **Out:** `{ repoId, s3Prefix, fileList[] }`
 
-Shallow clone (`--depth 1`) into `/tmp`, then upload the working tree to `s3://dune-repos/{repoId}/`. Pin to a commit SHA and record it.
+Resolve the default branch's HEAD to a commit SHA and download that commit's tarball into `/tmp`, then upload the working tree to `s3://dune-repos/{repoId}/`. Pin to the SHA and record it. A tarball rather than `git clone`, because the Lambda runtime has no git binary; GitHub's archive of a commit holds exactly its tracked files, the same set `git ls-files` gives, so the `.gitignore` filter below still holds.
 
 Filters applied while walking the tree, in this order:
 
@@ -184,6 +186,8 @@ Take the grammars from `@vscode/tree-sitter-wasm`. The obvious package, `tree-si
 **Call sites.** From `call_expression` nodes: the callee text and the line. Do not resolve the callee to a declaration — too expensive and error-prone. Store the raw text; retrieval can match on it.
 
 **Route registrations.** Call expressions whose callee matches `app.get|post|put|delete|use` or `router.get|post|put|delete|use`. Capture the first string argument as the route path. These matter disproportionately, because most "where do I add X" questions are about request paths.
+
+**Next.js App Router routes.** A Next.js app routes by file path, so it has no registration calls and the rule above finds nothing. When the repo has a `next.config.*`, treat `app/` and `src/app/` beside it as route roots: every `page.jsx|tsx` is a page route and every `route.js|ts` contributes one route per exported HTTP handler (`GET`, `POST`, …). The URL comes from the directory path, with dynamic segments such as `[groupId]` kept as written, route groups like `(marketing)` and slots like `@modal` dropped, and private `_folders` not routable. `src/app/group/[groupId]/page.jsx` becomes a page route at `/group/[groupId]`. These join the Express-style registrations in the same route table.
 
 ### Output shape
 
@@ -340,7 +344,7 @@ Friday evening is for this. Run `scripts/eval.ts`, look at which of the ten ques
 
 ## Generation
 
-The generation provider is not yet decided. It sits behind a `Generator` interface that takes the assembled context and the question and returns a validated `Answer`; Bedrock is one implementation of it, and anything else that can be forced to fill a schema drops in behind the same interface. Everything below the model subsection — prompt structure, schema enforcement, the anti-hallucination check and the confidence rules — is provider-independent and does not change with the choice.
+The generation provider is Gemini by default, with Groq as an alternative; `GENERATOR` selects one. Model ids live in `GEMINI_MODEL` and `GROQ_MODEL`, never in code, because both providers retire models regularly. Gemini is the default because Groq's free tier accepts only 8,000 tokens a minute, far below the ~30,000-token context cap. It sits behind a `Generator` interface that takes the assembled context and the question and returns a validated `Answer`; Bedrock drops in behind the same interface if access arrives, as would anything else that can be made to fill a schema. Prompt structure, the anti-hallucination check and the confidence rules are provider-independent. How the JSON shape is forced is provider-specific; see "Schema enforcement".
 
 ### Model and region, on the Bedrock path
 
@@ -372,13 +376,17 @@ User message, assembled in this order:
 
 ### Schema enforcement
 
-Do not parse prose. Use tool calling to force the shape: define a single tool whose input schema is the `Answer` object from `03-API.md`, and require the model to call it.
+Do not parse prose. How the shape is forced is provider-specific, because providers differ in which mechanism is reliable:
+
+- **Gemini:** JSON mode (`responseMimeType: application/json`), with the `Answer` shape described in the system prompt.
+- **Groq:** JSON mode (`response_format: json_object`), with the `Answer` shape described in the system prompt. Groq's JSON mode is more reliable than its tool calling.
+- **Bedrock:** tool calling — a single tool whose input schema is the `Answer` object from `03-API.md`, and the model required to call it.
 
 Validate the result with the same zod schema the API uses. On validation failure, retry once with the error appended. On a second failure, return `confidence: "low"` with whatever fields did validate, and let the UI show a retry.
 
 ### Anti-hallucination check
 
-After validation, verify every path in `recommendedFile`, `attachTo` and `sources` exists in the repo's file list. Any that does not: drop it and downgrade confidence. This is a five-line check that prevents the single worst demo failure — a confident answer pointing at a file that does not exist.
+After validation, verify every path in `recommendedFile`, `attachTo` and `sources` exists in the repo's file list. Any that does not: drop it and downgrade confidence. Line ranges in `sources` are held to the file's real length too: clamped when they run past the end, dropped when they start past it. This is a five-line check that prevents the single worst demo failure — a confident answer pointing at a file that does not exist.
 
 ### Confidence
 
@@ -457,6 +465,11 @@ sam build && sam deploy      # deploy everything
 AWS_REGION=ap-south-1
 BEDROCK_MODEL_ID=global.anthropic.claude-sonnet-4-6
 BEDROCK_EMBED_MODEL_ID=amazon.titan-embed-text-v2:0
+GENERATOR=gemini                # or groq
+GEMINI_MODEL=gemini-3.5-flash-lite
+GEMINI_API_KEY=...              # in the gitignored .env only; deployed as a NoEcho parameter
+GROQ_MODEL=openai/gpt-oss-120b
+GROQ_API_KEY=...                # likewise; only needed when GENERATOR=groq
 TABLE_NAME=dune
 REPO_BUCKET=dune-repos
 ```
@@ -465,7 +478,7 @@ Never commit a `.env`. The parser skips them for a reason and so should the repo
 
 ### Local pipeline shortcut
 
-`npm run index` runs clone, parse, chunk, embed and persist in sequence in one process, hitting real DynamoDB and Bedrock but bypassing Step Functions. This is the fast loop for development. Step Functions is only exercised on deploy, which is fine — its job is retries and visibility, not logic.
+`npm run index` runs clone, parse, chunk, embed and persist in sequence in one process, hitting real S3 and DynamoDB. It is the same pipeline `IndexFn` runs when a repo is submitted through the API, so a change verified locally is the change that deploys.
 
 ### Order of verification
 

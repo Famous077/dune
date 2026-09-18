@@ -34,6 +34,7 @@ import type {
   JobStatus,
   QueryRequest,
   QueryResponse,
+  RefreshSuggestionsRequest,
   RefreshSuggestionsResponse,
   RepoMeta,
   RepoStateResponse,
@@ -165,6 +166,7 @@ export const RepoMetaSchema = z.object({
 
 export const ErrorCodeSchema = z.enum([
   'INVALID_REPO_URL',
+  'INVALID_REQUEST',
   'REPO_NOT_FOUND',
   'REPO_TOO_LARGE',
   'NO_SUPPORTED_FILES',
@@ -188,7 +190,15 @@ export const ApiErrorSchema = z.object({
 /* ── Request and response envelopes ─────────────────────────────────────────── */
 
 /** No auth this weekend: `teamId` defaults to `demo` and everyone with the link shares it. */
-const teamId = z.string().min(1).default('demo');
+/**
+ * Ids that become part of a storage key are limited to a safe set, so no request can reach
+ * another team's or repo's items by putting a `#` in one.
+ */
+export const KeyIdSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]{1,64}$/, 'use letters, digits, - and _ only, up to 64 characters');
+
+const teamId = KeyIdSchema.default('demo');
 
 export const CreateRepoRequestSchema = z.object({
   repoUrl: z.string().min(1),
@@ -215,9 +225,10 @@ export const FileContentResponseSchema = z.object({
 }) satisfies z.ZodType<FileContentResponse>;
 
 export const QueryRequestSchema = z.object({
-  repoId: z.string().min(1),
+  repoId: KeyIdSchema,
   teamId,
-  question: z.string().min(1),
+  // Trimmed first, so a question of only whitespace is empty and rejected.
+  question: z.string().trim().min(1),
 }) satisfies z.ZodType<QueryRequest>;
 
 export const QueryResponseSchema = z.object({
@@ -231,15 +242,24 @@ export const ContextListResponseSchema = z.object({
 }) satisfies z.ZodType<ContextListResponse>;
 
 export const CreateContextRequestSchema = z.object({
-  repoId: z.string().min(1),
+  repoId: KeyIdSchema,
   teamId,
   type: ContextTypeSchema,
-  title: z.string().min(1),
-  body: z.string(),
-  files: z.array(repoPath),
-  fromSuggestionId: z.string().min(1).nullable().default(null),
+  title: z.string().trim().min(1).max(200),
+  body: z.string().trim().max(5000),
+  files: z.array(repoPath).max(50),
+  fromSuggestionId: KeyIdSchema.nullable().default(null),
   authoredBy: AuthoredBySchema.default('human'),
 }) satisfies z.ZodType<CreateContextRequest>;
+
+/** POST /suggestions/:repoId/refresh. The body is optional; without it, `since` is null. */
+export const RefreshSuggestionsRequestSchema = z.object({
+  since: z
+    .string()
+    .regex(/^[0-9a-f]{7,40}$/i, 'a commit SHA, 7 to 40 hex characters')
+    .nullable()
+    .default(null),
+}) satisfies z.ZodType<RefreshSuggestionsRequest>;
 
 export const RefreshSuggestionsResponseSchema = z.object({
   suggestions: z.array(SuggestionSchema).max(5),

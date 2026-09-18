@@ -3,22 +3,31 @@
  *
  * In:  { repoUrl }   Out: { repoId, commitSha, s3Prefix, files[] }
  *
- * Shallow clone into a temp directory, apply the filters from `docs/01-BACKEND.md` in the
- * order they are listed there, upload the working tree to S3, and pin the commit SHA so an
- * answer that was correct on Friday is still correct in Sunday's recording.
+ * Resolve the default branch's HEAD to a commit SHA, download that commit's tarball into a
+ * temp directory, apply the filters from `docs/01-BACKEND.md` in the order they are listed
+ * there, upload the working tree to S3, and pin the SHA so an answer that was correct on
+ * Friday is still correct in Sunday's recording.
+ *
+ * A tarball rather than `git clone`: the Lambda runtime has no git binary, and GitHub's
+ * archive of a commit holds exactly its tracked files — the same set `git ls-files` gives —
+ * so the .gitignore filter still holds, with one download and no history to discard.
  */
 
-import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFile, stat } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { promisify } from 'node:util';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import * as tar from 'tar';
 
 import { IndexerError } from './lib/errors';
 
-const exec = promisify(execFile);
+/** Lambda's /tmp is 2 GB here. A working tree bigger than this is refused, not truncated. */
+const MAX_TREE_BYTES = 1_500 * 1024 * 1024;
+
+const GITHUB_HEADERS = { 'user-agent': 'dune-indexer' };
 
 /** Skipped wherever they appear in the path, not just at the root. */
 const EXCLUDED_DIRS = new Set(['node_modules', 'dist', 'build', '.next', 'coverage', 'vendor']);
@@ -144,33 +153,112 @@ function parsePriority(a: string, b: string): number {
   return depth !== 0 ? depth : a.localeCompare(b);
 }
 
-async function git(args: string[], cwd: string): Promise<string> {
-  const { stdout } = await exec('git', args, {
-    cwd,
-    maxBuffer: 64 * 1024 * 1024,
-    // A clone that has not finished in five minutes is not going to.
-    timeout: 5 * 60_000,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_ASKPASS: 'echo' },
-  });
-  return stdout;
+const NOT_FOUND_MESSAGE = 'Repository not found or private. Check the URL, or try a public repository.';
+const UNREACHABLE_MESSAGE = 'Could not download the repository. GitHub may be unreachable — try again in a moment.';
+
+/** The default branch's current HEAD, as a full SHA. One GitHub API call. */
+async function resolveHead(slug: string): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch(`https://api.github.com/repos/${slug}/commits/HEAD`, {
+      headers: { ...GITHUB_HEADERS, accept: 'application/vnd.github.sha' },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (err) {
+    throw new IndexerError('INDEX_FAILED', UNREACHABLE_MESSAGE, { cause: err });
+  }
+  if (response.status === 404 || response.status === 409 || response.status === 422) {
+    // 409 is an empty repository: nothing to index is the same answer as nothing there.
+    throw new IndexerError('REPO_NOT_FOUND', NOT_FOUND_MESSAGE);
+  }
+  if (response.status === 403 || response.status === 429) {
+    throw new IndexerError('RATE_LIMITED', 'GitHub is limiting requests right now. Try again in a few minutes.');
+  }
+  const sha = (await response.text()).trim();
+  if (!response.ok || !/^[0-9a-f]{40}$/.test(sha)) {
+    throw new IndexerError('INDEX_FAILED', UNREACHABLE_MESSAGE);
+  }
+  return sha;
 }
 
-function cloneFailure(err: unknown): IndexerError {
-  const stderr = typeof err === 'object' && err !== null && 'stderr' in err ? String(err.stderr) : '';
+interface Extracted {
+  kept: RepoFile[];
+  skipped: SkipCounts;
+}
 
-  if (/not found|could not read Username|Authentication failed|access denied/i.test(stderr)) {
-    return new IndexerError(
-      'REPO_NOT_FOUND',
-      'Repository not found or private. Check the URL, or try a public repository.',
-      { cause: err },
+/**
+ * Streams the commit's tarball straight into `workDir`, applying the filters while it
+ * extracts: a skipped file is never written to disk. The archive's single top directory
+ * (`repo-<sha>/`) is stripped.
+ */
+async function downloadTree(slug: string, sha: string, workDir: string): Promise<Extracted> {
+  let response: Response;
+  try {
+    response = await fetch(`https://codeload.github.com/${slug}/tar.gz/${sha}`, {
+      headers: GITHUB_HEADERS,
+      signal: AbortSignal.timeout(5 * 60_000),
+    });
+  } catch (err) {
+    throw new IndexerError('INDEX_FAILED', UNREACHABLE_MESSAGE, { cause: err });
+  }
+  if (response.status === 404) throw new IndexerError('REPO_NOT_FOUND', NOT_FOUND_MESSAGE);
+  if (!response.ok || response.body === null) throw new IndexerError('INDEX_FAILED', UNREACHABLE_MESSAGE);
+
+  const skipped: SkipCounts = { excludedDir: 0, envFile: 0, tooLarge: 0 };
+  const kept: RepoFile[] = [];
+  let totalBytes = 0;
+  let overCap = false;
+
+  await mkdir(workDir, { recursive: true });
+  await pipeline(
+    Readable.fromWeb(response.body as import('node:stream/web').ReadableStream),
+    tar.x({
+      cwd: workDir,
+      strip: 1,
+      filter: (entryPath, entry) => {
+        const type = 'type' in entry ? entry.type : 'File';
+        if (type === 'Directory') return true;
+        // Symlinks and anything else that is not a plain file never reach the disk.
+        if (type !== 'File') return false;
+
+        const filePath = entryPath.split('/').slice(1).join('/');
+        if (filePath === '') return false;
+
+        if (inExcludedDir(filePath)) {
+          skipped.excludedDir += 1;
+          return false;
+        }
+        if (isEnvFile(filePath)) {
+          // Never read, never uploaded, never written to disk.
+          skipped.envFile += 1;
+          return false;
+        }
+        const size = entry.size ?? 0;
+        if (size > MAX_FILE_BYTES) {
+          skipped.tooLarge += 1;
+          return false;
+        }
+
+        totalBytes += size;
+        if (totalBytes > MAX_TREE_BYTES) {
+          overCap = true;
+          return false;
+        }
+
+        const extension = path.posix.extname(filePath).toLowerCase();
+        kept.push({ path: filePath, size, source: SOURCE_EXTENSIONS.has(extension), parse: false });
+        return true;
+      },
+    }),
+  );
+
+  if (overCap) {
+    throw new IndexerError(
+      'REPO_TOO_LARGE',
+      'This repository is too large to index here. Try a smaller repository, or a subdirectory of this one.',
     );
   }
-
-  return new IndexerError(
-    'INDEX_FAILED',
-    'Could not download the repository. It may be temporarily unreachable — try again in a moment.',
-    { cause: err },
-  );
+  return { kept, skipped };
 }
 
 /** Runs `tasks` with a bounded number in flight, preserving nothing but the errors. */
@@ -191,50 +279,10 @@ export async function clone(options: CloneOptions): Promise<CloneResult> {
   const { repoUrl, name } = normaliseRepoUrl(options.repoUrl);
   const repoId = repoIdFromUrl(repoUrl);
 
-  try {
-    await git(['clone', '--depth', '1', '--single-branch', repoUrl, options.workDir], process.cwd());
-  } catch (err) {
-    throw cloneFailure(err);
-  }
-
-  const commitSha = (await git(['rev-parse', 'HEAD'], options.workDir)).trim();
-
-  // `git ls-files` lists tracked files, which is the .gitignore filter: anything ignored
-  // was never committed, so it is not in this list.
-  const tracked = (await git(['ls-files', '-z'], options.workDir))
-    .split('\0')
-    .filter((entry) => entry !== '');
-
-  const skipped: SkipCounts = { excludedDir: 0, envFile: 0, tooLarge: 0 };
-  const kept: RepoFile[] = [];
-
-  for (const filePath of tracked) {
-    if (inExcludedDir(filePath)) {
-      skipped.excludedDir += 1;
-      continue;
-    }
-    if (isEnvFile(filePath)) {
-      // Never read, never uploaded.
-      skipped.envFile += 1;
-      continue;
-    }
-
-    let size: number;
-    try {
-      size = (await stat(path.join(options.workDir, filePath))).size;
-    } catch {
-      // A tracked path that is not a regular file (a submodule, a broken symlink).
-      continue;
-    }
-
-    if (size > MAX_FILE_BYTES) {
-      skipped.tooLarge += 1;
-      continue;
-    }
-
-    const extension = path.posix.extname(filePath).toLowerCase();
-    kept.push({ path: filePath, size, source: SOURCE_EXTENSIONS.has(extension), parse: false });
-  }
+  // The tarball holds exactly the commit's tracked files: that is the .gitignore filter,
+  // because anything ignored was never committed.
+  const commitSha = await resolveHead(name);
+  const { kept, skipped } = await downloadTree(name, commitSha, options.workDir);
 
   // Everything is kept; only the parse set is capped, with the overflow marked so Parse
   // can prioritise. `truncated` drives the banner in the UI.

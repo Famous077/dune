@@ -68,6 +68,8 @@ One SAM template at `infra/template.yaml`. One deploy command. Region ap-south-1
 | `Api` | API Gateway HTTP API | Cheaper and simpler than REST API; CORS open for the demo |
 | `McpService` | App Runner | The only always-on component, for SSE |
 
+**Deployed this weekend:** `IndexStateMachine` and the four pipeline functions were dropped for one `IndexFn` (3 GB memory, 15-minute timeout, 2 GB ephemeral storage) that runs the whole pipeline in a single invocation, started asynchronously by `ApiFn`. The reasons and trade-offs are in `01-BACKEND.md`, "Indexing pipeline". The sizing notes below apply to `IndexFn` as they would have to `CloneFn`.
+
 ### Lambda sizing notes
 
 **CloneFn needs ephemeral storage raised.** Default `/tmp` is 512 MB, which a mid-size repo with history will exceed. Set `EphemeralStorage: 2048`. Fail loudly if a clone exceeds it rather than silently truncating.
@@ -124,7 +126,7 @@ HTTP API with `AllowOrigins: "*"` for the weekend. The frontend and API are on d
 
 ### Secrets
 
-There are none. No API keys, no database passwords, no auth. Everything runs on IAM roles. This is worth mentioning in the architecture part of the video, because it is a genuine benefit of the design rather than an omission.
+The generation API keys: Gemini's (the default provider) and, optionally, Groq's. They live in the gitignored `.env`, reach the stack as `NoEcho` CloudFormation parameters through `npm run deploy`, and become environment variables on `ApiFn`. Only the selected provider's key is required; a template rule refuses a deploy without it. It is never committed and never appears in the template, `samconfig.toml` or deploy output. It is visible in the Lambda console to anyone who can read the function's configuration; SSM Parameter Store with a SecureString is the stronger option if that matters. Everything else — DynamoDB, S3, Bedrock if it arrives — runs on IAM roles with no keys at all.
 
 ## Deployment
 

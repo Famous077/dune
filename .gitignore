@@ -1,9 +1,12 @@
 node_modules/
 dist/
 *.tsbuildinfo
-
+.claude
 # SAM build output
 .aws-sam/
+
+# embedding model files, fetched at build time and bundled into the Lambda
+.models/
 
 # never commit env files — the parser skips them and so does the repo
 .env

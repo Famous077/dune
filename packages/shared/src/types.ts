@@ -127,6 +127,7 @@ export interface RepoMeta {
  */
 export type ErrorCode =
   | 'INVALID_REPO_URL'
+  | 'INVALID_REQUEST'
   | 'REPO_NOT_FOUND'
   | 'REPO_TOO_LARGE'
   | 'NO_SUPPORTED_FILES'
@@ -207,6 +208,11 @@ export interface CreateContextRequest {
   files: string[];
   fromSuggestionId: string | null;
   authoredBy: 'human' | 'agent';
+}
+
+/** POST /suggestions/:repoId/refresh. `since` replaces the indexed commit as the base. */
+export interface RefreshSuggestionsRequest {
+  since: string | null;
 }
 
 /** POST /suggestions/:repoId/refresh -> 200. Capped at 5. */

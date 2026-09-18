@@ -17,6 +17,7 @@ import { Language, Parser } from 'web-tree-sitter';
 import type { Node as SyntaxNode } from 'web-tree-sitter';
 
 import { IndexerError } from './lib/errors';
+import { addNextRoutes } from './next-routes';
 
 /** The output shape from `docs/01-BACKEND.md`, "Tree-sitter extraction". */
 export interface ParsedFile {
@@ -472,6 +473,9 @@ export async function parseRepo(options: ParseOptions): Promise<ParseResult> {
       failures.push({ path: filePath, reason: err instanceof Error ? err.message : String(err) });
     }
   }
+
+  // File-path routes need the whole tree, so they are added once every file is parsed.
+  addNextRoutes(files, options.allFiles);
 
   return { files, failures, syntaxErrors };
 }

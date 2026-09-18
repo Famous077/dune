@@ -50,6 +50,7 @@ Every non-2xx response, without exception:
 | Code | HTTP | Retryable |
 | --- | --- | --- |
 | `INVALID_REPO_URL` | 400 | false |
+| `INVALID_REQUEST` | 400 | false |
 | `REPO_NOT_FOUND` | 404 | false |
 | `REPO_TOO_LARGE` | 400 | false |
 | `NO_SUPPORTED_FILES` | 400 | false |
@@ -62,6 +63,8 @@ Every non-2xx response, without exception:
 | `INTERNAL` | 500 | true |
 
 `retryable` drives whether the UI shows a retry button. The frontend does not decide this; the backend states it.
+
+`INVALID_REQUEST` means the request body is missing, is not JSON, or fails validation — an empty question, for example. Any endpoint that takes a body can return it, and retrying the same request will not help.
 
 ## Shared types
 
@@ -189,7 +192,7 @@ Start indexing. Returns immediately; the pipeline runs asynchronously.
 
 `repoId` is deterministic from the normalised URL, so re-submitting the same repo returns the same id. If it is already indexed and ready, `alreadyIndexed` is true and the frontend skips straight to the map.
 
-**Errors:** `INVALID_REPO_URL`, `REPO_NOT_FOUND`, `REPO_TOO_LARGE`
+**Errors:** `INVALID_REPO_URL`, `REPO_NOT_FOUND`, `REPO_TOO_LARGE`, `INVALID_REQUEST` (no `repoUrl` in the body), `RATE_LIMITED` (GitHub is limiting requests), `INDEX_FAILED` (the job could not be started)
 
 ### GET /repos/:repoId
 
@@ -236,6 +239,8 @@ Polled every 1.5s during indexing, then once on load.
 **Response 200, failed**
 
 Stage is `failed`, `failedStage` names where it broke, `failureReason` is a human sentence. Still a 200 — the request succeeded, the job did not. The frontend renders the failure state from the body, not from an HTTP code.
+
+**Errors:** `NOT_FOUND` (the repo has never been submitted)
 
 ### GET /repos/:repoId/files/\*
 
@@ -307,7 +312,7 @@ The core call. Everything else supports this.
 }
 ```
 
-**Errors:** `INDEX_NOT_READY` (retryable, frontend polls and retries), `QUERY_FAILED`, `MODEL_UNAVAILABLE`, `RATE_LIMITED`
+**Errors:** `INVALID_REQUEST` (missing or empty question), `NOT_FOUND` (the repo has never been indexed), `INDEX_NOT_READY` (retryable, frontend polls and retries), `QUERY_FAILED`, `MODEL_UNAVAILABLE`, `RATE_LIMITED`
 
 ### Guarantees the backend must hold
 
@@ -358,6 +363,8 @@ On `low` confidence, render the candidate list instead of a single recommendatio
 
 Items are newest first. Only suggestions with pending status are returned; saved and dismissed ones are not.
 
+**Errors:** `NOT_FOUND` (the repo was never indexed)
+
 ### POST /context
 
 Create a context item, either from scratch or by approving a suggestion.
@@ -379,19 +386,35 @@ Create a context item, either from scratch or by approving a suggestion.
 
 The fromSuggestionId field is optional. When present, that suggestion is marked saved in the same write.
 
+Approving a suggestion is a human act: a request with `fromSuggestionId` and `authoredBy: "agent"` is rejected with `INVALID_REQUEST`. Agents write their own items, which are stored as agent-authored; they never turn a draft into team context.
+
 **Response 201:** the created ContextItem.
 
-### POST /suggestions/:repoId/refresh
+**Errors:** `INVALID_REQUEST` (missing fields, an agent approving a suggestion, or a suggestion that was already saved or dismissed), `NOT_FOUND` (the repo was never indexed, or the suggestion does not exist)
+
+### POST /suggestions/:repoId/refresh?teamId=demo
 
 Generate drafts from the diff between the indexed commit and current HEAD.
 
-**Response 200:** an object with a suggestions array, capped at 5.
+**Request body, optional**
+
+```json
+{ "since": "07516da" }
+```
+
+`since` compares that commit with HEAD instead of the indexed commit. It exists for demos and testing, where the repo may not have moved since it was indexed. Without a body, the indexed commit is used.
+
+**Response 200:** an object with a suggestions array, capped at 5. It holds every pending suggestion for the repo, new ones included, and there are never more than 5 pending at once — a refresh only drafts enough to fill the free slots. Drafts that repeat an existing context item or any earlier suggestion, dismissed ones included, are discarded.
 
 Synchronous and may take several seconds. The frontend shows a loading state on the refresh control.
 
-### POST /suggestions/:id/dismiss
+**Errors:** `NOT_FOUND` (the repo was never indexed), `REPO_NOT_FOUND` (GitHub cannot find the repo or the `since` commit), `RATE_LIMITED`, `MODEL_UNAVAILABLE`, `QUERY_FAILED`
 
-**Response 200:** an ok flag. Dismissed suggestions are marked, not deleted, and are never re-suggested.
+### POST /suggestions/:id/dismiss?teamId=demo
+
+**Response 200:** an ok flag. Dismissed suggestions are marked, not deleted, and are never re-suggested. Dismissing one that is already dismissed is a no-op that succeeds.
+
+**Errors:** `NOT_FOUND` (no such suggestion), `INVALID_REQUEST` (the suggestion was already saved as context)
 
 ### GET /export/:repoId?teamId=demo
 
@@ -400,6 +423,8 @@ Synchronous and may take several seconds. The frontend shows a loading state on 
 The markdown contains, in this order: repo summary, decisions, dead ends, constraints, and the current file structure overview. It is written to be pasted directly into any agent, so it must be readable on its own without knowing where it came from.
 
 Export never fails on empty context. With nothing saved, it returns the repo structure summary alone.
+
+**Errors:** `NOT_FOUND` (the repo was never indexed)
 
 ## MCP tool contract
 

@@ -7,7 +7,9 @@ version = 0.1
 stack_name = "dune"
 
 [default.build.parameters]
-cached = true
+# Not cached: SAM hashes only CodeUri (packages/api), so edits in packages/shared or
+# packages/indexer — which the bundle includes — would silently ship a stale build.
+cached = false
 parallel = true
 
 [default.deploy.parameters]

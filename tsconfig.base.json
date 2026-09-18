@@ -22,7 +22,12 @@
 
     "paths": {
       "@dune/shared": ["./packages/shared/src/index.ts"],
-      "@dune/shared/*": ["./packages/shared/src/*.ts"]
+      "@dune/shared/*": ["./packages/shared/src/*.ts"],
+      "@dune/indexer/embed": ["./packages/indexer/src/embed.ts"],
+      "@dune/indexer/errors": ["./packages/indexer/src/lib/errors.ts"],
+      "@dune/indexer/storage": ["./packages/indexer/src/lib/db.ts"],
+      "@dune/indexer/vectors": ["./packages/indexer/src/lib/vectors.ts"],
+      "@dune/indexer/clone": ["./packages/indexer/src/clone.ts"]
     }
   }
 }
