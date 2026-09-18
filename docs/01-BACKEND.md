@@ -396,6 +396,13 @@ Set `confidence` from real signals, not the model's self-report:
 - `medium` — recommended file was retrieved but scores were middling
 - `low` — recommended file came from graph expansion only, or validation needed a retry
 
+Retrieval scores alone undersell precise answers, so verified evidence from the index can raise them, and nothing else can:
+
+- **Route:** the question names a request path in the route table (with its method, if given) and the recommended file registers it → `high`.
+- **Symbol:** a retrieved declaration in the recommended file has a name covering two or more of the question's keywords, and no other retrieved file matches as well → at least `medium`. The "no other file" condition keeps a caller from being raised alongside the definition.
+
+Both need a recommended file, so "nothing here does this" stays `low`. The penalties above still apply afterwards, and the model's own confidence can only ever lower the result. On the known-answer eval this moved answerable questions from 3 high / 6 medium / 18 low to 6 / 9 / 12 across three runs, with the pass rate unchanged.
+
 A visible, honest confidence level reads as engineering maturity to a judge. Saying "I am not sure, here are the three likely places" is better than a confident wrong answer, and it is a line worth saying out loud in the demo video.
 
 ## Suggestions and MCP

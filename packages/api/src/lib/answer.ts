@@ -8,9 +8,11 @@
  *     are held to the same standard.
  *   - `sources` is never empty. If the model cited nothing real, the top retrieved code is
  *     cited instead, and confidence goes down a level.
- *   - Confidence starts from the retrieval signals. Every rule after that can only lower it:
- *     a retry, a recommended file outside the retrieved set, a dropped path, the model's own
- *     doubt. Nothing the model says raises it.
+ *   - Confidence starts from the retrieval signals, and can be raised only by evidence the
+ *     index verifies about the recommended file (see `verifiedEvidence`): the file registers
+ *     the route the question names, or it defines the symbol the question describes. Every
+ *     rule after that can only lower it: a retry, a recommended file outside the retrieved
+ *     set, a dropped path, the model's own doubt. Nothing the model says raises it.
  *   - At low confidence, `candidates` holds two or three places; otherwise it is null.
  */
 
@@ -19,7 +21,7 @@ import type { Answer, Candidate, Confidence, Source } from '@dune/shared';
 
 import { ApiFailure } from './errors';
 import type { Generation } from './generation';
-import type { Retrieval } from './retrieval';
+import { related, words, type Retrieval } from './retrieval';
 
 const LEVEL: Record<Confidence, number> = { low: 0, medium: 1, high: 2 };
 const lower = (a: Confidence, b: Confidence): Confidence => (LEVEL[a] <= LEVEL[b] ? a : b);
@@ -35,6 +37,75 @@ function normalise(path: string): string {
 function fixLines([start, end]: [number, number]): [number, number] {
   const first = Math.max(1, Math.min(start, end));
   return [first, Math.max(first, start, end)];
+}
+
+/* ── Verified evidence ──────────────────────────────────────────────────────── */
+
+const HTTP_METHOD = /\b(get|post|put|patch|delete)\b/gi;
+/** A request path as people write it in a question: "/users/login", "/api/articles/:slug". */
+const QUESTION_PATH = /(?:^|[\s`'"(])(\/[A-Za-z0-9_\-./:[\]{}]*)/g;
+/** A symbol name must cover this many of the question's keywords to count. */
+const SYMBOL_MIN_KEYWORDS = 2;
+
+export interface Evidence {
+  level: Confidence;
+  note: string;
+}
+
+/**
+ * Evidence from the index, not the model, that the recommended file is the answer. Either
+ * one can raise the retrieval-based confidence; nothing else can.
+ *
+ * - **Route.** The question names a request path that is in the repo's route table, with its
+ *   method when the question gives one, and the recommended file is where that route is
+ *   registered. Stored paths are relative to their router, so a question path matches when
+ *   it equals a stored path or ends with it after a mount prefix ("/api/users/login" matches
+ *   "/users/login"). Near-certain, so high.
+ * - **Symbol.** A declaration retrieved for this question, in the recommended file, has a name
+ *   covering at least two of the question's keywords — "balances … calculated" and
+ *   `calculateBalancesByUid` — and no other retrieved file has a declaration that matches as
+ *   well. The last condition is what keeps a file that merely calls the function from being
+ *   raised alongside the file that defines it. Strong but not certain, so medium.
+ *
+ * Neither applies without a recommended file, so an answer that says "nothing here does
+ * this" cannot be raised.
+ */
+export function verifiedEvidence(recommendedFile: string | null, retrieval: Retrieval): Evidence | null {
+  if (recommendedFile === null) return null;
+  const question = retrieval.question;
+
+  const paths = [...question.matchAll(QUESTION_PATH)]
+    .map((match) => (match[1] ?? '').replace(/[.,;:?!)]+$/, '').replace(/\/+$/, '') || '/')
+    .filter((path) => path.length > 0);
+  if (paths.length > 0) {
+    const methods = new Set([...question.matchAll(HTTP_METHOD)].map((m) => (m[1] ?? '').toLowerCase()));
+    const route = retrieval.routes.routes.find((entry) => {
+      if (entry.file !== recommendedFile) return false;
+      if (methods.size > 0 && !methods.has(entry.method.toLowerCase())) return false;
+      return paths.some((path) => path === entry.path || (entry.path !== '/' && path.endsWith(entry.path)));
+    });
+    if (route) {
+      return { level: 'high', note: `verified route: ${route.method.toUpperCase()} ${route.path} is registered in ${route.file}:${route.line}` };
+    }
+  }
+
+  // Keywords a declaration's name covers, per file, over the chunks retrieved for this question.
+  const coverage = (symbolName: string): number => {
+    const tokens = words(symbolName);
+    return retrieval.keywords.filter((keyword) => tokens.some((token) => related(keyword, token))).length;
+  };
+  const bestByFile = new Map<string, { symbol: string; covered: number }>();
+  for (const { chunk } of retrieval.chunks) {
+    if (chunk.symbolName === null) continue;
+    const covered = coverage(chunk.symbolName);
+    const best = bestByFile.get(chunk.path);
+    if (best === undefined || covered > best.covered) bestByFile.set(chunk.path, { symbol: chunk.symbolName, covered });
+  }
+  const own = bestByFile.get(recommendedFile);
+  if (own === undefined || own.covered < SYMBOL_MIN_KEYWORDS) return null;
+  const rival = [...bestByFile.entries()].some(([file, best]) => file !== recommendedFile && best.covered >= own.covered);
+  if (rival) return null;
+  return { level: 'medium', note: `verified symbol: ${recommendedFile} defines ${own.symbol}, matching ${own.covered} question keywords` };
 }
 
 export interface Finalised {
@@ -120,6 +191,13 @@ export function finaliseAnswer(generation: Generation, retrieval: Retrieval): Fi
   /* Confidence ------------------------------------------------------------------ */
   let confidence: Confidence = retrieval.provisionalConfidence;
   notes.push(`retrieval signals: ${confidence}`);
+
+  // The only raise, and it comes from the index. Everything below can still lower it.
+  const evidence = verifiedEvidence(recommendedFile, retrieval);
+  if (evidence !== null) {
+    notes.push(evidence.note);
+    if (LEVEL[evidence.level] > LEVEL[confidence]) confidence = evidence.level;
+  }
 
   if (generation.attempts > 1 || generation.answer === null) {
     confidence = 'low';

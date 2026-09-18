@@ -69,7 +69,7 @@ const STOPWORDS = new Set([
 ]);
 
 /** Splits camelCase, PascalCase, snake_case, kebab-case, paths and punctuation. */
-function words(text: string): string[] {
+export function words(text: string): string[] {
   return text
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
@@ -87,7 +87,7 @@ export function extractKeywords(question: string): string[] {
  * That is a crude stemmer — settlement/settlements/settle, create/created/createGroup,
  * group/groups, calculation/calculations — and crude is enough for path and symbol tokens.
  */
-function related(a: string, b: string): boolean {
+export function related(a: string, b: string): boolean {
   const shorter = Math.min(a.length, b.length);
   if (shorter < 3) return false;
   const needed = Math.min(5, shorter);
