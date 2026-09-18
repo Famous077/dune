@@ -20,7 +20,9 @@ applications:
             - node -v && npm -v
             # A missing API address would build a site that cannot reach anything.
             - test -n "$VITE_API_URL" || (echo "VITE_API_URL is not set in the Amplify environment variables" && exit 1)
-            - cd ../.. && npm ci -w @dune/web --include-workspace-root=false
+            # In a subshell: Amplify runs every command in one shell, so a bare `cd` would
+            # leave the build phase at the repo root, where `npm run build` is `sam build`.
+            - (cd ../.. && npm ci -w @dune/web --include-workspace-root=false)
         build:
           commands:
             - nvm use 24
