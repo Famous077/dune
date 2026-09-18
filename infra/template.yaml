@@ -30,6 +30,14 @@ Parameters:
     NoEcho: true
     Default: ''
 
+  # Optional. Raises GitHub's limit from 60 requests an hour per shared Lambda IP to 5,000
+  # for the token. Needs no scopes: a fine-grained token with public repository read-only
+  # access. Blank means unauthenticated.
+  GithubToken:
+    Type: String
+    NoEcho: true
+    Default: ''
+
   # Providers retire model ids regularly. When one goes, change these — no code change.
   # A lite model: free-tier gemini-3.6-flash allows only 20 requests a day per project.
   GeminiModel:
@@ -80,6 +88,9 @@ Globals:
         # regional model id fails, and the error is not obvious.
         BEDROCK_MODEL_ID: global.anthropic.claude-sonnet-4-6
         BEDROCK_EMBED_MODEL_ID: amazon.titan-embed-text-v2:0
+        # Both functions call GitHub: IndexFn to resolve HEAD and download the tarball,
+        # ApiFn to check a repo before indexing and to diff for suggestions.
+        GITHUB_TOKEN: !Ref GithubToken
 
 Resources:
   # ── Storage ────────────────────────────────────────────────────────────────
@@ -229,7 +240,33 @@ Resources:
     Metadata:
       BuildMethod: makefile
 
+  # The MCP server, at {ApiUrl}/mcp: Streamable HTTP, stateless, a thin wrapper that calls this
+  # same API over HTTP. The design puts it on App Runner with SSE; App Runner is not available
+  # to this account, so it runs here (docs/01-BACKEND.md, "MCP server").
+  McpFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../packages/mcp
+      Handler: lambda.handler
+      Description: Dune MCP server — get_project_context, find_where_to_change, save_decision.
+      MemorySize: 256
+      # Tool calls wait on POST /query, which API Gateway caps at 30 s anyway.
+      Timeout: 30
+      Events:
+        # More specific than ApiFn's /{proxy+}, so /mcp reaches this function.
+        Mcp:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /mcp
+            Method: ANY
+    Metadata:
+      BuildMethod: makefile
+
 Outputs:
+  McpUrl:
+    Description: MCP server endpoint (Streamable HTTP). Add ?repoId=<id> to set a default repo.
+    Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com/mcp'
   ApiUrl:
     Description: Base URL of the HTTP API. Health check is GET {ApiUrl}/v1/health.
     Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com'

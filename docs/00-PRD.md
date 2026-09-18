@@ -257,7 +257,7 @@ Hard limits the implementation must respect. Claude Code should treat these as c
 
 **Cost**
 
-- Everything scales to zero between demos. No provisioned capacity, no always-on instances except App Runner for MCP, which is the single exception and is justified by SSE.
+- Everything scales to zero between demos. No provisioned capacity, no always-on instances except App Runner for MCP, which is the single exception and is justified by SSE. (As deployed, not even that: App Runner is unavailable to our account, so MCP runs on Lambda over Streamable HTTP.)
 - Stay inside the $100 team credits plus free tier for the full weekend.
 
 **Browser support**

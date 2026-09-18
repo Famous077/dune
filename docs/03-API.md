@@ -430,7 +430,9 @@ Export never fails on empty context. With nothing saved, it returns the repo str
 
 The MCP server is a thin wrapper over the HTTP API above. No duplicated logic, no second retrieval path.
 
-**Transport:** remote, SSE, on App Runner.
+**Transport:** remote, Streamable HTTP (stateless), at `{API base}/mcp` on the same HTTP API as everything above — `POST` only. The design was SSE on App Runner; App Runner is not available to our AWS account, so the server runs as a Lambda, which cannot hold SSE sessions. Streamable HTTP is also what the MCP spec now recommends over SSE. See `01-BACKEND.md`, "MCP server".
+
+**Connection URL parameters,** both optional: `teamId` (default `demo`, as in the API) and `repoId`, a default repo for the connection. With `repoId` on the URL, `repoId` may be left out of every tool call.
 
 ### Tools
 

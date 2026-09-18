@@ -474,6 +474,7 @@ function DuneConsole() {
 
           {/* SCREEN 3: Context Drawer (Slide-over drawer over Screen 2) */}
           <ContextPanel
+            repoId={repoId}
             repoName={repoName}
             items={contextItems}
             suggestions={suggestions}

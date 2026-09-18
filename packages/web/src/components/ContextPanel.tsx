@@ -21,6 +21,7 @@ import { EmptyState } from './EmptyState';
 import { ErrorState } from './ErrorState';
 
 interface ContextPanelProps {
+  repoId: string | null;
   repoName: string | null;
   items: ContextItem[];
   /** Pending suggestions only; saved and dismissed ones never come back from the API. */
@@ -45,6 +46,7 @@ interface ContextPanelProps {
 type TabType = 'all' | 'decision' | 'dead-end' | 'constraint';
 
 export function ContextPanel({
+  repoId,
   repoName,
   items,
   suggestions,
@@ -92,9 +94,13 @@ export function ContextPanel({
 
   if (!isOpen) return null;
 
+  // The repo rides on the URL, so an agent connected with it needs no repo id of its own.
+  const mcpUrl =
+    MCP_URL && repoId ? `${MCP_URL}${MCP_URL.includes('?') ? '&' : '?'}repoId=${encodeURIComponent(repoId)}` : MCP_URL;
+
   const handleCopyMcp = () => {
-    if (!MCP_URL) return;
-    navigator.clipboard.writeText(MCP_URL);
+    if (!mcpUrl) return;
+    navigator.clipboard.writeText(mcpUrl);
     setMcpCopied(true);
     setTimeout(() => setMcpCopied(false), 2000);
   };
@@ -386,7 +392,7 @@ export function ContextPanel({
       </div>
 
       {/* Section 24: MCP Integration — shown only once the MCP service is deployed */}
-      {MCP_URL && (
+      {mcpUrl && (
       <div
         id="mcp-connection-section"
         className="border-t border-neutral-800 bg-neutral-900/60 p-4 shrink-0 font-mono text-xs"
@@ -405,7 +411,7 @@ export function ContextPanel({
             MCP ENDPOINT
           </span>
           <div className="flex items-center gap-1.5 bg-neutral-950 border border-neutral-800 px-2.5 py-1.5 text-[11px] text-neutral-300 rounded-lg">
-            <span className="truncate flex-1">{MCP_URL}</span>
+            <span className="truncate flex-1">{mcpUrl}</span>
             <button
               id="btn-copy-mcp"
               onClick={handleCopyMcp}

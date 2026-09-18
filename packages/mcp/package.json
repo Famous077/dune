@@ -2,12 +2,20 @@
   "name": "@dune/mcp",
   "version": "0.1.0",
   "private": true,
-  "description": "MCP server on App Runner. A thin wrapper over the HTTP API.",
+  "description": "The Dune MCP server: a thin wrapper over the HTTP API. Deployed as McpFn (Lambda, Streamable HTTP); src/server.ts runs it as a local process with SSE too.",
   "type": "module",
+  "scripts": {
+    "dev": "esbuild src/server.ts --bundle --platform=node --target=node24 --format=esm --sourcemap --packages=external --outfile=dist/server.mjs && node --enable-source-maps --env-file-if-exists=.env dist/server.mjs",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
-    "@dune/shared": "*"
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/aws-lambda": "^8.10.163",
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.2",
     "typescript": "^5.9.0"
   }
 }

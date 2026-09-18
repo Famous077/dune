@@ -27,7 +27,21 @@ import { IndexerError } from './lib/errors';
 /** Lambda's /tmp is 2 GB here. A working tree bigger than this is refused, not truncated. */
 const MAX_TREE_BYTES = 1_500 * 1024 * 1024;
 
-const GITHUB_HEADERS = { 'user-agent': 'dune-indexer' };
+/**
+ * Headers for every GitHub request, from the indexer and the API alike. Unauthenticated,
+ * GitHub allows 60 API requests an hour per source IP, and Lambda's egress IPs are shared;
+ * with `GITHUB_TOKEN` set it is 5,000 an hour for the token. The token needs no scopes at all
+ * — every repo Dune reads is public — so a fine-grained token with public read-only access
+ * is enough, and it is never sent anywhere but github.com.
+ */
+export function githubHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const token = process.env['GITHUB_TOKEN'];
+  return {
+    'user-agent': 'dune',
+    ...(token ? { authorization: `Bearer ${token}` } : {}),
+    ...extra,
+  };
+}
 
 /** Skipped wherever they appear in the path, not just at the root. */
 const EXCLUDED_DIRS = new Set(['node_modules', 'dist', 'build', '.next', 'coverage', 'vendor']);
@@ -161,7 +175,7 @@ async function resolveHead(slug: string): Promise<string> {
   let response: Response;
   try {
     response = await fetch(`https://api.github.com/repos/${slug}/commits/HEAD`, {
-      headers: { ...GITHUB_HEADERS, accept: 'application/vnd.github.sha' },
+      headers: githubHeaders({ accept: 'application/vnd.github.sha' }),
       signal: AbortSignal.timeout(15_000),
     });
   } catch (err) {
@@ -195,7 +209,7 @@ async function downloadTree(slug: string, sha: string, workDir: string): Promise
   let response: Response;
   try {
     response = await fetch(`https://codeload.github.com/${slug}/tar.gz/${sha}`, {
-      headers: GITHUB_HEADERS,
+      headers: githubHeaders(),
       signal: AbortSignal.timeout(5 * 60_000),
     });
   } catch (err) {

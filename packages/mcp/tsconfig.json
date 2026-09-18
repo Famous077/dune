@@ -1,4 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "aws-lambda"],
+    // The MCP SDK's types are not written for this flag: its own transport classes fail
+    // their Transport interface under it.
+    "exactOptionalPropertyTypes": false
+  },
   "include": ["src/**/*.ts"]
 }

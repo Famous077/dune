@@ -15,7 +15,7 @@
     "index": "esbuild packages/indexer/src/run-local.ts --bundle --platform=node --format=cjs --external:web-tree-sitter --external:@xenova/transformers --sourcemap --log-level=warning --outfile=node_modules/.cache/dune/index-repo.cjs && node --enable-source-maps --env-file-if-exists=.env node_modules/.cache/dune/index-repo.cjs",
     "similarity": "esbuild packages/indexer/src/similarity.ts --bundle --platform=node --format=cjs --external:web-tree-sitter --external:@xenova/transformers --sourcemap --log-level=warning --outfile=node_modules/.cache/dune/similarity.cjs && node --enable-source-maps --env-file-if-exists=.env node_modules/.cache/dune/similarity.cjs",
     "build": "cd infra && sam build",
-    "deploy": "cd infra && set -a && . ../.env && set +a && sam deploy --parameter-overrides \"GeminiApiKey=${GEMINI_API_KEY:-}\" \"GroqApiKey=${GROQ_API_KEY:-}\" \"Generator=${GENERATOR:-gemini}\" \"GeminiModel=${GEMINI_MODEL:-gemini-3.5-flash-lite}\" \"GeminiThinkingLevel=${GEMINI_THINKING_LEVEL-low}\" \"GroqModel=${GROQ_MODEL:-openai/gpt-oss-120b}\" \"ContextTokenCap=${CONTEXT_TOKEN_CAP:-30000}\"",
+    "deploy": "cd infra && set -a && . ../.env && set +a && sam deploy --parameter-overrides ${GEMINI_API_KEY:+GeminiApiKey=$GEMINI_API_KEY} ${GROQ_API_KEY:+GroqApiKey=$GROQ_API_KEY} ${GITHUB_TOKEN:+GithubToken=$GITHUB_TOKEN} \"Generator=${GENERATOR:-gemini}\" \"GeminiModel=${GEMINI_MODEL:-gemini-3.5-flash-lite}\" \"GeminiThinkingLevel=${GEMINI_THINKING_LEVEL-low}\" \"GroqModel=${GROQ_MODEL:-openai/gpt-oss-120b}\" \"ContextTokenCap=${CONTEXT_TOKEN_CAP:-30000}\"",
     "clean": "rm -rf infra/.aws-sam packages/*/dist packages/*/*.tsbuildinfo"
   },
   "devDependencies": {

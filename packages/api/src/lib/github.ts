@@ -3,11 +3,13 @@
  * indexed at (or an explicit `since`) against the default branch's current HEAD. No git
  * binary and no clone — Lambda has neither, and one API call is enough.
  *
- * Unauthenticated, so GitHub allows 60 requests an hour per source IP, and Lambda's egress
- * IPs are shared. Enough for a hackathon; a token would be the fix if it starts to bite.
+ * Authenticated when GITHUB_TOKEN is set (see githubHeaders); otherwise GitHub allows 60
+ * requests an hour per source IP, and Lambda's egress IPs are shared.
  */
 
 import { z } from 'zod';
+
+import { githubHeaders } from '@dune/indexer/clone';
 
 import { ApiFailure } from './errors';
 
@@ -74,7 +76,7 @@ export async function checkRepoIndexable(repoUrl: string): Promise<void> {
   let response: Response;
   try {
     response = await fetch(`https://api.github.com/repos/${slug}`, {
-      headers: { accept: 'application/vnd.github+json', 'user-agent': 'dune-context-layer' },
+      headers: githubHeaders({ accept: 'application/vnd.github+json' }),
       signal: AbortSignal.timeout(8_000),
     });
   } catch (err) {
@@ -108,7 +110,7 @@ export async function compareWithHead(repoUrl: string, base: string): Promise<Re
   let response: Response;
   try {
     response = await fetch(`https://api.github.com/repos/${slug}/compare/${base}...HEAD`, {
-      headers: { accept: 'application/vnd.github+json', 'user-agent': 'dune-context-layer' },
+      headers: githubHeaders({ accept: 'application/vnd.github+json' }),
       signal: AbortSignal.timeout(8_000),
     });
   } catch (err) {

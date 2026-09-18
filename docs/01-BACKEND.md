@@ -13,7 +13,7 @@ This doc covers everything behind the API: indexing, storage, retrieval, generat
 - **Runtime:** Node.js 24, TypeScript throughout. Lambda deprecated the Node 20 runtime on 2026-04-30.
 - **Parsing:** `web-tree-sitter` with WASM grammars for TypeScript and TSX. Not the native `tree-sitter` bindings — native modules mean compiling for the Lambda runtime and that is a time sink we are not paying for.
 - **Orchestration:** AWS Step Functions for the indexing pipeline — dropped for the weekend; see "Indexing pipeline"
-- **Compute:** Lambda for API handlers and pipeline steps; App Runner for the MCP server only
+- **Compute:** Lambda for API handlers and pipeline steps; App Runner for the MCP server only (this weekend a Lambda too — see "MCP server")
 - **Storage:** S3 for repo snapshots, DynamoDB for graph, metadata, chunks and context
 - **Vectors:** start with embeddings stored in DynamoDB and cosine similarity computed in the query Lambda. Only move to OpenSearch Serverless if measured retrieval time exceeds 1 second on the demo repo.
 - **Embeddings and generation:** both behind provider interfaces. The default embedder is local — `@xenova/transformers` running `all-MiniLM-L6-v2` in-process — so indexing needs no model access at all. The Bedrock implementations (Claude Sonnet via the global cross-Region inference profile, Titan for embeddings) stay documented as the alternative path, used if access arrives. Bedrock is optional for this hackathon; deploying on AWS is the only requirement.
@@ -63,7 +63,7 @@ dune/
       src/lib/retrieval.ts
       src/lib/bedrock.ts
       src/lib/db.ts
-    mcp/                     # App Runner service
+    mcp/                     # MCP server (McpFn; designed for App Runner)
       src/server.ts
   infra/
     template.yaml            # SAM template, everything
@@ -425,6 +425,8 @@ Cap at 5 drafts per refresh. More than that and nobody reviews any of them.
 Built last. Dropped without discussion if the core is not solid by Saturday night.
 
 **Deployment:** App Runner, not Lambda. MCP remote transport holds long-lived SSE connections, which App Runner handles naturally. This is the only always-on component and that trade-off is deliberate.
+
+**What actually runs this weekend: a Lambda, Streamable HTTP, no SSE.** App Runner refuses our account in every region (`SubscriptionRequiredException` on create), so App Runner is not an option. The server runs as `McpFn` on the existing HTTP API at `/mcp`, serving the stateless Streamable HTTP transport: each `POST` builds a server, answers and ends, which a Lambda does naturally. SSE is dropped because it needs one process to hold each session between requests, and it is the transport the MCP spec has since deprecated in favour of Streamable HTTP; Claude Code, Claude Desktop and Cursor all connect over Streamable HTTP. Nothing is always-on as a result. `packages/mcp/src/server.ts` runs the same tools as a long-lived process with both transports, for local development or a container host later.
 
 **Tools exposed:**
 
