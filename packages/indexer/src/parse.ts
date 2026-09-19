@@ -18,11 +18,12 @@ import type { Node as SyntaxNode } from 'web-tree-sitter';
 
 import { IndexerError } from './lib/errors';
 import { addNextRoutes } from './next-routes';
+import { applyRoutePrefixes, createPythonResolver, extractPython } from './python';
 
 /** The output shape from `docs/01-BACKEND.md`, "Tree-sitter extraction". */
 export interface ParsedFile {
   path: string;
-  language: 'ts' | 'tsx' | 'js' | 'jsx';
+  language: 'ts' | 'tsx' | 'js' | 'jsx' | 'py';
   lineCount: number;
   imports: { specifier: string; resolved: string | null; names: string[] }[];
   exports: { name: string; isDefault: boolean }[];
@@ -52,7 +53,8 @@ export interface ParseOptions {
   allFiles: string[];
 }
 
-/** Resolution order for a specifier without an extension. */
+/** Resolution order for a specifier without an extension. TypeScript and JavaScript only:
+ * Python resolves through the package tree instead, in `python.ts`. */
 const EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'] as const;
 
 /** A call chain longer than this is noise; the first part is what retrieval matches on. */
@@ -81,7 +83,7 @@ function findGrammarDir(): string {
 
   throw new IndexerError(
     'INDEX_FAILED',
-    'The TypeScript grammars are missing. Run npm install, or set GRAMMAR_DIR to the directory holding the tree-sitter .wasm files.',
+    'The tree-sitter grammars are missing. Run npm install, or set GRAMMAR_DIR to the directory holding the tree-sitter .wasm files.',
   );
 }
 
@@ -90,6 +92,8 @@ interface Grammars {
   typescript: Parser;
   /** .tsx, .jsx and .js — the TSX grammar handles all three. */
   tsx: Parser;
+  /** .py */
+  python: Parser;
 }
 
 async function loadGrammars(): Promise<Grammars> {
@@ -106,6 +110,7 @@ async function loadGrammars(): Promise<Grammars> {
   return {
     typescript: await load('tree-sitter-typescript.wasm'),
     tsx: await load('tree-sitter-tsx.wasm'),
+    python: await load('tree-sitter-python.wasm'),
   };
 }
 
@@ -118,6 +123,8 @@ function languageOf(filePath: string): ParsedFile['language'] {
       return 'tsx';
     case '.jsx':
       return 'jsx';
+    case '.py':
+      return 'py';
     default:
       return 'js';
   }
@@ -446,6 +453,7 @@ export async function parseRepo(options: ParseOptions): Promise<ParseResult> {
   const grammars = await loadGrammars();
   const aliases = await readPathAliases(options.rootDir);
   const resolver = createResolver(options.allFiles, aliases);
+  const pythonResolver = createPythonResolver(options.allFiles);
 
   const files: ParsedFile[] = [];
   const failures: ParseFailure[] = [];
@@ -454,7 +462,9 @@ export async function parseRepo(options: ParseOptions): Promise<ParseResult> {
   for (const filePath of options.files) {
     try {
       const source = await readFile(path.join(options.rootDir, filePath), 'utf8');
-      const parser = languageOf(filePath) === 'ts' ? grammars.typescript : grammars.tsx;
+      const language = languageOf(filePath);
+      const parser =
+        language === 'py' ? grammars.python : language === 'ts' ? grammars.typescript : grammars.tsx;
       const tree = parser.parse(source);
 
       if (tree === null) {
@@ -464,7 +474,11 @@ export async function parseRepo(options: ParseOptions): Promise<ParseResult> {
 
       try {
         if (tree.rootNode.hasError) syntaxErrors.push(filePath);
-        files.push(extractFile(filePath, source, tree.rootNode, resolver));
+        files.push(
+          language === 'py'
+            ? extractPython(filePath, source, tree.rootNode, pythonResolver)
+            : extractFile(filePath, source, tree.rootNode, resolver),
+        );
       } finally {
         // Trees are held in WASM memory and are not garbage collected.
         tree.delete();
@@ -476,6 +490,8 @@ export async function parseRepo(options: ParseOptions): Promise<ParseResult> {
 
   // File-path routes need the whole tree, so they are added once every file is parsed.
   addNextRoutes(files, options.allFiles);
+  // FastAPI mount prefixes live in the file doing the mounting, so the same applies.
+  applyRoutePrefixes(files);
 
   return { files, failures, syntaxErrors };
 }

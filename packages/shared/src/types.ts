@@ -149,7 +149,7 @@ export interface ApiError {
 
 /* ── Request and response envelopes ─────────────────────────────────────────── */
 
-export type Language = 'ts' | 'tsx' | 'js' | 'jsx';
+export type Language = 'ts' | 'tsx' | 'js' | 'jsx' | 'py';
 
 /** POST /repos */
 export interface CreateRepoRequest {

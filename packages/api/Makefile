@@ -39,7 +39,7 @@ MODEL_FILES := config.json tokenizer.json tokenizer_config.json onnx/model_quant
 MODEL_CACHE := $(ROOT)/.models/$(MODEL_REVISION)
 
 ORT_PLATFORM := linux/arm64
-GRAMMARS := tree-sitter-typescript.wasm tree-sitter-tsx.wasm
+GRAMMARS := tree-sitter-typescript.wasm tree-sitter-tsx.wasm tree-sitter-python.wasm
 
 build-ApiFn build-IndexFn:
 	@test -n "$(MODEL_REVISION)" || { echo "Could not read MODEL_REVISION from local.ts"; exit 1; }

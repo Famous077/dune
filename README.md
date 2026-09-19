@@ -62,7 +62,7 @@ S3 (repo snapshot, for the source drawer)
 
 - **TypeScript everywhere**, one npm workspace: `packages/shared` (types from the contract),
   `api`, `indexer`, `web`, `mcp`. One SAM template (`infra/template.yaml`), region ap-south-1.
-- **Parsing:** `web-tree-sitter` with WASM grammars. TS, TSX, JS, JSX only.
+- **Parsing:** `web-tree-sitter` with WASM grammars: TS, TSX, JS, JSX and Python. Route detection covers Express, Next.js App Router, Flask and FastAPI, including blueprint and router prefixes.
 - **Embeddings run inside the Lambda**, no external call. **Generation** is Gemini
   (`gemini-3.5-flash-lite`), with Groq as a switchable alternative; both behind one interface,
   as is Bedrock, which the hackathon made optional and our account could not get access to.
@@ -101,7 +101,7 @@ fix one of them deliberately.
 **Committed this weekend:** repo indexing, architecture map, "where do I change this"
 queries, team knowledge layer, git-aware suggestion drafting, context export, MCP server.
 
-**Deliberately out of scope:** languages beyond TypeScript and JS, multiple repos, auth
+**Deliberately out of scope:** languages beyond TypeScript, JS and Python, multiple repos, auth
 and accounts, code generation, real-time collaboration. See the roadmap in `00-PRD.md`.
 
 ## Connect an agent (MCP)

@@ -151,7 +151,7 @@ export async function getRepoState(
 
 /* ── GET /v1/repos/:repoId/files/* ───────────────────────────────────────────── */
 
-const LANGUAGE: Record<string, Language> = { ts: 'ts', tsx: 'tsx', js: 'js', jsx: 'jsx' };
+const LANGUAGE: Record<string, Language> = { ts: 'ts', tsx: 'tsx', js: 'js', jsx: 'jsx', py: 'py' };
 
 export async function getFile(
   _event: APIGatewayProxyEventV2,

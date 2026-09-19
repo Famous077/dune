@@ -44,10 +44,14 @@ export function githubHeaders(extra: Record<string, string> = {}): Record<string
 }
 
 /** Skipped wherever they appear in the path, not just at the root. */
-const EXCLUDED_DIRS = new Set(['node_modules', 'dist', 'build', '.next', 'coverage', 'vendor']);
+const EXCLUDED_DIRS = new Set([
+  'node_modules', 'dist', 'build', '.next', 'coverage', 'vendor',
+  // Python: bytecode, virtual environments and anything installed into one.
+  '__pycache__', 'venv', '.venv', 'site-packages', '.tox', '.mypy_cache', '.pytest_cache',
+]);
 
 /** Parsed this weekend. Other files are counted but never parsed. */
-const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx']);
+const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.py']);
 
 const MAX_FILE_BYTES = 500 * 1024;
 

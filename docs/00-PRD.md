@@ -92,7 +92,7 @@ Team is CloudSmiths. Track is Ship It, deployed on AWS with a live URL.
 
 These are deliberately out of scope for the 4 days and go on the roadmap. We pick them up in this order only if the committed set is finished and stable:
 
-- More languages beyond TypeScript and JS (Python first, its grammar is the cheapest to add)
+- More languages beyond TypeScript, JS and Python (Python shipped: the second grammar cost a day, and Flask and FastAPI route detection came with it)
 - Multiple repos in one brain
 - Auth, accounts and real team management
 - Code generation, not just locating the change
@@ -343,7 +343,7 @@ Freeze the API contract above. Hand the frontend pair dummy JSON in the exact an
 
 In priority order, top first:
 
-1. Clone and parse. TypeScript and TSX only. Imports, exports and calls via tree-sitter WASM. Module graph is enough, no full AST semantics.
+1. Clone and parse. TypeScript, TSX, JS, JSX and Python. Imports, exports and calls via tree-sitter WASM. Module graph is enough, no full AST semantics.
 2. Chunk and embed. Start simple. Only add OpenSearch if simple search measurably falls over.
 3. Query endpoint. Retrieval plus graph neighbours plus Bedrock, structured JSON enforced.
 4. Answer quality tuning. This takes the longest and cannot be rushed, which is why the buffer runs to Friday night.

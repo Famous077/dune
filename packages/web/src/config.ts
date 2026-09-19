@@ -10,6 +10,11 @@ export const SAMPLE_REPOS = [
     name: 'gothinkster/node-express-realworld-example-app',
     note: 'Express',
   },
+  {
+    url: 'https://github.com/nsidnev/fastapi-realworld-example-app',
+    name: 'nsidnev/fastapi-realworld-example-app',
+    note: 'Python · FastAPI',
+  },
 ] as const;
 
 export const SAMPLE_REPO_URL = SAMPLE_REPOS[0].url;

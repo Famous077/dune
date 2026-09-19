@@ -11,7 +11,7 @@ This doc covers everything behind the API: indexing, storage, retrieval, generat
 ### Stack
 
 - **Runtime:** Node.js 24, TypeScript throughout. Lambda deprecated the Node 20 runtime on 2026-04-30.
-- **Parsing:** `web-tree-sitter` with WASM grammars for TypeScript and TSX. Not the native `tree-sitter` bindings — native modules mean compiling for the Lambda runtime and that is a time sink we are not paying for.
+- **Parsing:** `web-tree-sitter` with WASM grammars for TypeScript, TSX and Python. Not the native `tree-sitter` bindings — native modules mean compiling for the Lambda runtime and that is a time sink we are not paying for.
 - **Orchestration:** AWS Step Functions for the indexing pipeline — dropped for the weekend; see "Indexing pipeline"
 - **Compute:** Lambda for API handlers and pipeline steps; App Runner for the MCP server only (this weekend a Lambda too — see "MCP server")
 - **Storage:** S3 for repo snapshots, DynamoDB for graph, metadata, chunks and context
@@ -21,7 +21,7 @@ This doc covers everything behind the API: indexing, storage, retrieval, generat
 
 ### Non-negotiables
 
-- Language support this weekend is TypeScript and TSX only. Do not add a second grammar.
+- Language support is TypeScript, TSX, JavaScript, JSX and Python. Python was added once the rest was deployed, because a second grammar in the same pipeline is cheap: see "Python extraction". Do not add a third without the same evidence.
 - Every response the API returns must match the shape in `03-API.md` exactly, including null fields rather than missing keys.
 - No feature lands without an error path. The frontend must never receive an unhandled exception.
 
@@ -108,10 +108,10 @@ Resolve the default branch's HEAD to a commit SHA and download that commit's tar
 Filters applied while walking the tree, in this order:
 
 - Skip anything matched by `.gitignore`
-- Skip `node_modules`, `dist`, `build`, `.next`, `coverage`, `vendor`
+- Skip `node_modules`, `dist`, `build`, `.next`, `coverage`, `vendor`, and Python's `__pycache__`, `venv`, `.venv`, `site-packages`, `.tox`, `.mypy_cache`, `.pytest_cache`
 - Skip any `.env*` file. Never read, never upload.
 - Skip files over 500 KB
-- Keep only `.ts`, `.tsx`, `.js`, `.jsx` for parsing; record the existence of other files for the file count but do not parse them
+- Keep only `.ts`, `.tsx`, `.js`, `.jsx`, `.py` for parsing; record the existence of other files for the file count but do not parse them
 
 If the file count exceeds the cap (1,000), keep all files but mark the overflow so Parse can prioritise. Record `truncated: true` on the repo record so the UI can show the banner.
 
@@ -168,7 +168,9 @@ await Parser.init();
 const parser = new Parser();
 const TS = await Language.load('tree-sitter-typescript.wasm');
 const TSX = await Language.load('tree-sitter-tsx.wasm');
+const PY = await Language.load('tree-sitter-python.wasm');
 // .ts -> TS grammar, .tsx/.jsx -> TSX grammar, .js -> TSX grammar (handles flow-ish syntax)
+// .py -> Python grammar; the extraction for it is in packages/indexer/src/python.ts
 ```
 
 Bundle the `.wasm` files into the Lambda package. Do not fetch them at runtime.
@@ -189,12 +191,22 @@ Take the grammars from `@vscode/tree-sitter-wasm`. The obvious package, `tree-si
 
 **Next.js App Router routes.** A Next.js app routes by file path, so it has no registration calls and the rule above finds nothing. When the repo has a `next.config.*`, treat `app/` and `src/app/` beside it as route roots: every `page.jsx|tsx` is a page route and every `route.js|ts` contributes one route per exported HTTP handler (`GET`, `POST`, …). The URL comes from the directory path, with dynamic segments such as `[groupId]` kept as written, route groups like `(marketing)` and slots like `@modal` dropped, and private `_folders` not routable. `src/app/group/[groupId]/page.jsx` becomes a page route at `/group/[groupId]`. These join the Express-style registrations in the same route table.
 
+### Python extraction
+
+Same `ParsedFile` out, so chunking, the graph and retrieval never learn a second shape. Three things genuinely differ, and they are the whole of `python.ts`.
+
+**Imports resolve through the package tree.** `a.b.c` is `a/b/c.py` or `a/b/c/__init__.py`, and the package root is often a subdirectory (`app/`, `src/`, `backend/`), so the repo root and every ancestor of the importing file are tried as roots, nearest first. Relative imports count their leading dots: `from .module import y` is the current package, `from ..pkg.mod import z` the one above. `from package import module` names a file rather than a symbol, so it yields an edge to that module as well as to the package's `__init__.py`. An alias (`import api as articles`) binds the alias, while the original name is what locates the file — both are kept, because the alias is the name the rest of the file uses.
+
+**There are no exports.** Module-level `def`, `class` and assignments are the public surface. A module declaring `__all__` is taken at its word; otherwise every top-level name not starting with `_` is exported.
+
+**Routes are decorators, and their prefixes live somewhere else.** Flask's `@app.route("/x", methods=["POST"])` and `@bp.route`, FastAPI's `@app.get("/x")` and `@router.post("/x")`; `@router.get("")` is the collection endpoint and is real. The path a request actually uses is only known once the mounts are read: `app.register_blueprint(auth_bp, url_prefix="/auth")` and `router.include_router(articles.router, prefix="/articles")` sit in different files from the routes, and they nest. So a prefix belongs to a router or blueprint *object*, identified by the file that defines it and its name there, with names followed back through imports; prefixes then accumulate along the mount chain. Flask's `bp`, created in `app/auth/__init__.py`, decorated in `app/auth/routes.py` and registered in `app/__init__.py`, comes out as `/auth/login`. A prefix given as a variable (`prefix=settings.api_prefix`) cannot be read statically, so that link contributes nothing and the path is one segment short rather than wrong.
+
 ### Output shape
 
 ```ts
 interface ParsedFile {
   path: string;
-  language: 'ts' | 'tsx' | 'js' | 'jsx';
+  language: 'ts' | 'tsx' | 'js' | 'jsx' | 'py';
   lineCount: number;
   imports: { specifier: string; resolved: string | null; names: string[] }[];
   exports: { name: string; isDefault: boolean }[];

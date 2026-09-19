@@ -208,7 +208,7 @@ export function RepoInput({ onConnect, onUseSample, isLoading = false, error = n
                 <Sparkles className="w-3.5 h-3.5 text-[#F0DFB4]" />
                 <span>Pre-indexed repositories:</span>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {SAMPLE_REPOS.map((repo) => (
                   <button
                     key={repo.url}

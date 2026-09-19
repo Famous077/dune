@@ -51,7 +51,7 @@ const repoPath = z.string().min(1);
 export const ConfidenceSchema = z.enum(['high', 'medium', 'low']);
 export const ContextTypeSchema = z.enum(['decision', 'dead-end', 'constraint']);
 export const AuthoredBySchema = z.enum(['human', 'agent']);
-export const LanguageSchema = z.enum(['ts', 'tsx', 'js', 'jsx']);
+export const LanguageSchema = z.enum(['ts', 'tsx', 'js', 'jsx', 'py']);
 export const JobStageSchema = z.enum([
   'queued',
   'cloning',

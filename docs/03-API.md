@@ -252,6 +252,8 @@ File contents for the source drawer.
 { "path": "src/routes/auth.ts", "content": "...", "lineCount": 84, "language": "ts" }
 ```
 
+`language` is one of `ts`, `tsx`, `js`, `jsx`, `py` — the indexed languages.
+
 **Errors:** `NOT_FOUND` if the path is not in the indexed set. The frontend shows a "file not available" state rather than an empty drawer.
 
 ## Query endpoint
